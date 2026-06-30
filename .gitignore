@@ -3,3 +3,6 @@ dist/
 .env
 npm-debug.log*
 transcript.json
+
+.vercel
+.env*
