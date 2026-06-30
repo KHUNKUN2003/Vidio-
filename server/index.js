@@ -1,5 +1,6 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import { pathToFileURL } from "node:url";
 import express from "express";
 import { signJwt, verifyJwt } from "../auth-domain.mjs";
 import { generateOtp, isAdminCredential, isValidOtp, normalizePhoneNumber } from "../admin-utils.mjs";
@@ -18,7 +19,7 @@ import {
 import { buildDashboardStats, normalizeVideoOrderPayload, normalizeVideoPayload } from "../video-domain.mjs";
 import { ensureSchema, pool, requireDatabase } from "./db.js";
 
-const app = express();
+export const app = express();
 const port = Number(process.env.PORT || 4174);
 const jwtSecret = process.env.JWT_SECRET || "course-dashboard-dev-secret";
 const clientUrl = process.env.CLIENT_URL || "http://127.0.0.1:5173";
@@ -613,13 +614,21 @@ app.use((error, _request, response, _next) => {
   response.status(500).json({ error: "Internal server error" });
 });
 
-ensureSchema()
-  .then(() => {
-    app.listen(port, "127.0.0.1", () => {
-      console.log(`API server running on http://127.0.0.1:${port}`);
+export async function initializeDatabase() {
+  await ensureSchema();
+}
+
+const isMainModule = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
+  initializeDatabase()
+    .then(() => {
+      app.listen(port, "127.0.0.1", () => {
+        console.log(`API server running on http://127.0.0.1:${port}`);
+      });
+    })
+    .catch((error) => {
+      console.error("Failed to initialize database schema", error);
+      process.exitCode = 1;
     });
-  })
-  .catch((error) => {
-    console.error("Failed to initialize database schema", error);
-    process.exitCode = 1;
-  });
+}

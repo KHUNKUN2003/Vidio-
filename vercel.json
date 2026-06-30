@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/[...path].js": {
+      "includeFiles": "server/schema.sql"
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
