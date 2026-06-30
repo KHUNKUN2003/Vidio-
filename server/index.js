@@ -11,6 +11,7 @@ import {
   normalizeLineMembershipPayload,
 } from "../membership-domain.mjs";
 import {
+  SESSION_IDLE_SECONDS,
   SESSION_TTL_SECONDS,
   buildUserSessionPayload,
   getUserSessionExpiresAt,
@@ -55,24 +56,35 @@ function pruneExpiredMapEntries(map) {
   }
 }
 
+async function pruneInactiveUserSessions() {
+  await pool.query(
+    `DELETE FROM user_sessions
+     WHERE expires_at <= NOW()
+        OR last_seen_at <= NOW() - ($1::int * INTERVAL '1 second')`,
+    [SESSION_IDLE_SECONDS],
+  );
+}
+
 async function buildLineAuthResult(membershipRequest, { enforceSingleSession = false, currentSessionId = "" } = {}) {
   const canWatch = canWatchWithMembership(membershipRequest.status);
   let sessionId = currentSessionId;
 
   if (canWatch) {
-    await pool.query("DELETE FROM user_sessions WHERE expires_at <= NOW()");
+    await pruneInactiveUserSessions();
     const activeSession = await pool.query(
-      `SELECT session_id, expires_at
+      `SELECT session_id, expires_at, last_seen_at
        FROM user_sessions
        WHERE identity_type = 'line'
          AND identity_value = $1`,
       [membershipRequest.line_user_id],
     );
+    const activeSessionRow = activeSession.rows[0];
+    const isExistingSessionActive = hasActiveUserSession(activeSessionRow);
 
     if (
       enforceSingleSession
-      && hasActiveUserSession(activeSession.rows[0])
-      && activeSession.rows[0].session_id !== currentSessionId
+      && isExistingSessionActive
+      && activeSessionRow.session_id !== currentSessionId
     ) {
       return {
         error: "บัญชีนี้กำลังใช้งานอยู่ในอุปกรณ์อื่น",
@@ -81,7 +93,7 @@ async function buildLineAuthResult(membershipRequest, { enforceSingleSession = f
       };
     }
 
-    sessionId = activeSession.rows[0]?.session_id || currentSessionId || crypto.randomUUID();
+    sessionId = isExistingSessionActive ? activeSessionRow.session_id : currentSessionId || crypto.randomUUID();
     const expiresAt = getUserSessionExpiresAt();
     await pool.query(
       `INSERT INTO user_sessions (phone, identity_type, identity_value, session_id, expires_at)
@@ -195,9 +207,9 @@ app.post("/api/auth/user/verify-otp", requireDatabase, async (request, response,
   }
 
   try {
-    await pool.query("DELETE FROM user_sessions WHERE expires_at <= NOW()");
+    await pruneInactiveUserSessions();
     const activeSession = await pool.query(
-      "SELECT expires_at FROM user_sessions WHERE identity_type = 'phone' AND identity_value = $1",
+      "SELECT expires_at, last_seen_at FROM user_sessions WHERE identity_type = 'phone' AND identity_value = $1",
       [phone],
     );
 
@@ -224,6 +236,44 @@ app.post("/api/auth/user/verify-otp", requireDatabase, async (request, response,
       token: createSessionToken(buildUserSessionPayload(phone, sessionId)),
       user: { role: "user", phone },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/auth/heartbeat", requireDatabase, requireAuth("user"), async (request, response, next) => {
+  try {
+    await pruneInactiveUserSessions();
+
+    let result = { rowCount: 0 };
+    if (request.user.phone && request.user.sessionId) {
+      result = await pool.query(
+        `UPDATE user_sessions
+         SET last_seen_at = NOW(),
+             expires_at = $3
+         WHERE identity_type = 'phone'
+           AND identity_value = $1
+           AND session_id = $2`,
+        [request.user.phone, request.user.sessionId, getUserSessionExpiresAt()],
+      );
+    } else if (request.user.provider === "line" && request.user.lineUserId && request.user.sessionId) {
+      result = await pool.query(
+        `UPDATE user_sessions
+         SET last_seen_at = NOW(),
+             expires_at = $3
+         WHERE identity_type = 'line'
+           AND identity_value = $1
+           AND session_id = $2`,
+        [request.user.lineUserId, request.user.sessionId, getUserSessionExpiresAt()],
+      );
+    }
+
+    if (!result.rowCount) {
+      response.status(401).json({ error: "Session is no longer active" });
+      return;
+    }
+
+    response.status(204).send();
   } catch (error) {
     next(error);
   }

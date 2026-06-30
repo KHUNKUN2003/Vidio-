@@ -87,6 +87,40 @@ function App() {
   }, [session]);
 
   useEffect(() => {
+    if (session?.role !== "user" || !session.token) return undefined;
+
+    let isActive = true;
+    const sendHeartbeat = async () => {
+      try {
+        const response = await fetch("/api/auth/heartbeat", {
+          method: "POST",
+          headers: authHeaders(session.token),
+        });
+
+        if (!isActive || response.ok) return;
+
+        setAuthNotice({
+          title: "เซสชันหมดอายุ",
+          message: "บัญชีนี้ไม่ได้ใช้งานต่อเนื่องหรือถูกเปิดใช้งานจากอุปกรณ์อื่น กรุณาเข้าสู่ระบบใหม่",
+          type: "error",
+        });
+        setRoleTab("user");
+        saveSession(null);
+      } catch {
+        // Keep the current session during a temporary network issue.
+      }
+    };
+
+    const intervalId = window.setInterval(sendHeartbeat, 30000);
+    sendHeartbeat();
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+    };
+  }, [session]);
+
+  useEffect(() => {
     if (session?.provider !== "line" || !session.lineUserId) return undefined;
 
     let isActive = true;
