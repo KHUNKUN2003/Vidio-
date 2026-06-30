@@ -40,6 +40,7 @@ Set your environment variables:
 
 ```env
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/course_video_dashboard
+DATABASE_SSL=false
 PORT=4174
 JWT_SECRET=change-this-to-a-long-random-secret
 CLIENT_URL=http://127.0.0.1:5173
@@ -99,6 +100,7 @@ Main tables:
 - `membership_requests`
 
 Neon PostgreSQL works by setting `DATABASE_URL` to your Neon connection string.
+For Neon deployments, set `DATABASE_SSL=true`.
 
 ## Scripts
 
