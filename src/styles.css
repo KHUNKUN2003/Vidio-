@@ -695,8 +695,24 @@ label {
   height: 100%;
   display: block;
   border: 0;
-  transform-origin: center center;
-  transition: transform 180ms ease;
+}
+
+.fullscreen-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  min-height: 36px;
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #1d1d1f;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+}
+
+.fullscreen-button:hover,
+.fullscreen-button:focus-visible {
+  background: #ffffff;
 }
 
 .youtube-link-shield {
@@ -708,52 +724,6 @@ label {
   height: min(12%, 82px);
   background: transparent;
   cursor: default;
-}
-
-.zoom-panel {
-  display: grid;
-  grid-template-columns: minmax(86px, auto) 40px minmax(180px, 1fr) 40px auto;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
-  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.80);
-  backdrop-filter: blur(18px) saturate(1.18);
-}
-
-.zoom-panel div {
-  display: grid;
-  gap: 2px;
-}
-
-.zoom-panel span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.zoom-panel strong {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.zoom-panel button {
-  min-width: 40px;
-  padding: 0 12px;
-}
-
-.zoom-panel input[type="range"] {
-  height: 38px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  accent-color: var(--accent);
 }
 
 .video-list {
@@ -1068,15 +1038,6 @@ label {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .zoom-panel {
-    grid-template-columns: minmax(0, 1fr) 40px 40px auto;
-  }
-
-  .zoom-panel input[type="range"] {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
   .row-actions {
     grid-column: 1 / -1;
     flex-wrap: wrap;
@@ -1102,14 +1063,6 @@ label {
   .button-row {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .zoom-panel {
-    grid-template-columns: 1fr 40px 40px;
-  }
-
-  .zoom-panel button:last-child {
-    grid-column: 1 / -1;
   }
 
   .password-field {
