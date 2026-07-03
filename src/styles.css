@@ -720,6 +720,13 @@ label {
   height: min(16%, 88px);
 }
 
+.youtube-more-options-shield {
+  left: 31%;
+  bottom: 0;
+  width: 38%;
+  height: min(13%, 76px);
+}
+
 .youtube-brand-shield {
   right: 74px;
   bottom: 0;
@@ -736,6 +743,12 @@ label {
   .youtube-copy-shield {
     width: 30%;
     height: 22%;
+  }
+
+  .youtube-more-options-shield {
+    left: 28%;
+    width: 44%;
+    height: 19%;
   }
 
   .youtube-brand-shield {
