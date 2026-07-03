@@ -981,18 +981,6 @@ function WatchArea({ videos, isLoading, selectedVideoId, selectedVideo, onSelect
   const visibleVideos = videos.filter((video) => video.is_active);
   const activeVideoId = selectedVideoId || visibleVideos[0]?.youtube_video_id || DEFAULT_VIDEO_ID;
   const showSkeleton = isLoading && !videos.length;
-  const videoFrameRef = useRef(null);
-
-  function openFullscreen() {
-    const frame = videoFrameRef.current;
-    if (!frame) return;
-
-    if (frame.requestFullscreen) {
-      frame.requestFullscreen();
-    } else if (frame.webkitRequestFullscreen) {
-      frame.webkitRequestFullscreen();
-    }
-  }
 
   return (
     <section className="watch-shell">
@@ -1016,7 +1004,7 @@ function WatchArea({ videos, isLoading, selectedVideoId, selectedVideo, onSelect
           </>
         ) : (
           <>
-            <div className="video-frame" ref={videoFrameRef}>
+            <div className="video-frame">
               <iframe
                 title="YouTube video player"
                 src={buildEmbedUrl(activeVideoId)}
@@ -1025,9 +1013,6 @@ function WatchArea({ videos, isLoading, selectedVideoId, selectedVideo, onSelect
                 referrerPolicy="strict-origin-when-cross-origin"
                 sandbox="allow-scripts allow-same-origin allow-presentation"
               />
-              <button className="fullscreen-button" type="button" onClick={openFullscreen}>
-                เต็มจอ
-              </button>
               <div aria-hidden="true" className="youtube-link-shield" onContextMenu={(event) => event.preventDefault()} />
             </div>
             <div className="video-library">
