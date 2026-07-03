@@ -14,7 +14,7 @@ function App() {
     const saved = sessionStorage.getItem("course-session");
     return saved ? JSON.parse(saved) : null;
   });
-  const [roleTab, setRoleTab] = useState("admin");
+  const [roleTab, setRoleTab] = useState("user");
   const [videos, setVideos] = useState([]);
   const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0 });
   const [selectedVideoId, setSelectedVideoId] = useState(DEFAULT_VIDEO_ID);
@@ -435,15 +435,6 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
           <p>พื้นที่ดูวิดีโอแบบเรียบง่ายสำหรับผู้ใช้ และมี dashboard สำหรับ admin จัดการคลิป</p>
         </div>
 
-        <div className="role-tabs" aria-label="เลือกบทบาท">
-          <button className={roleTab === "admin" ? "is-active" : ""} onClick={() => onRoleChange("admin")} type="button">
-            Admin
-          </button>
-          <button className={roleTab === "user" ? "is-active" : ""} onClick={() => onRoleChange("user")} type="button">
-            User
-          </button>
-        </div>
-
         {roleTab === "admin" ? (
           <form className="form-stack" onSubmit={submitAdmin}>
             <label>
@@ -497,6 +488,15 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
             <p className={otpMessage.includes("ไม่") ? "form-message" : "form-message success-message"}>{otpMessage}</p>
           </div>
         )}
+        <button
+          aria-label={roleTab === "admin" ? "กลับไปหน้า user" : "เข้าสู่หน้า admin"}
+          className={roleTab === "admin" ? "admin-info-button is-active" : "admin-info-button"}
+          onClick={() => onRoleChange(roleTab === "admin" ? "user" : "admin")}
+          title={roleTab === "admin" ? "User login" : "Admin login"}
+          type="button"
+        >
+          i
+        </button>
       </div>
     </section>
   );
