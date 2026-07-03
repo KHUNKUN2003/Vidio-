@@ -981,6 +981,12 @@ function WatchArea({ videos, isLoading, selectedVideoId, selectedVideo, onSelect
   const visibleVideos = videos.filter((video) => video.is_active);
   const activeVideoId = selectedVideoId || visibleVideos[0]?.youtube_video_id || DEFAULT_VIDEO_ID;
   const showSkeleton = isLoading && !videos.length;
+  const [videoZoom, setVideoZoom] = useState(1);
+  const zoomPercent = Math.round(videoZoom * 100);
+
+  function updateZoom(nextZoom) {
+    setVideoZoom(Math.min(2, Math.max(1, Number(nextZoom))));
+  }
 
   return (
     <section className="watch-shell">
@@ -1011,8 +1017,33 @@ function WatchArea({ videos, isLoading, selectedVideoId, selectedVideo, onSelect
                 allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
                 referrerPolicy="strict-origin-when-cross-origin"
                 sandbox="allow-scripts allow-same-origin allow-presentation"
+                style={{ transform: `scale(${videoZoom})` }}
               />
               <div aria-hidden="true" className="youtube-link-shield" onContextMenu={(event) => event.preventDefault()} />
+            </div>
+            <div className="zoom-panel" aria-label="ควบคุมการซูมวิดีโอ">
+              <div>
+                <span>Zoom</span>
+                <strong>{zoomPercent}%</strong>
+              </div>
+              <button type="button" onClick={() => updateZoom(videoZoom - 0.1)} disabled={videoZoom <= 1}>
+                -
+              </button>
+              <input
+                aria-label="ปรับการซูมวิดีโอ"
+                max="2"
+                min="1"
+                onChange={(event) => updateZoom(event.target.value)}
+                step="0.05"
+                type="range"
+                value={videoZoom}
+              />
+              <button type="button" onClick={() => updateZoom(videoZoom + 0.1)} disabled={videoZoom >= 2}>
+                +
+              </button>
+              <button type="button" onClick={() => updateZoom(1)} disabled={videoZoom === 1}>
+                Reset
+              </button>
             </div>
             <div className="video-library">
               <div>
