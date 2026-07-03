@@ -699,13 +699,50 @@ label {
 
 .youtube-link-shield {
   position: absolute;
-  right: 0;
-  bottom: 0;
   z-index: 2;
-  width: min(30%, 380px);
-  height: min(12%, 82px);
   background: transparent;
   cursor: default;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.youtube-title-shield {
+  top: 0;
+  left: 0;
+  width: min(52%, 620px);
+  height: min(16%, 86px);
+}
+
+.youtube-copy-shield {
+  left: 0;
+  bottom: 0;
+  width: min(24%, 220px);
+  height: min(16%, 88px);
+}
+
+.youtube-brand-shield {
+  right: 74px;
+  bottom: 0;
+  width: min(26%, 340px);
+  height: min(15%, 84px);
+}
+
+@media (max-width: 760px) {
+  .youtube-title-shield {
+    width: 66%;
+    height: 24%;
+  }
+
+  .youtube-copy-shield {
+    width: 30%;
+    height: 22%;
+  }
+
+  .youtube-brand-shield {
+    right: 58px;
+    width: 34%;
+    height: 21%;
+  }
 }
 
 .video-list {

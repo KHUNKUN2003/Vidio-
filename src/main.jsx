@@ -1013,7 +1013,9 @@ function WatchArea({ videos, isLoading, selectedVideoId, selectedVideo, onSelect
                 referrerPolicy="strict-origin-when-cross-origin"
                 sandbox="allow-scripts allow-same-origin allow-presentation"
               />
-              <div aria-hidden="true" className="youtube-link-shield" onContextMenu={(event) => event.preventDefault()} />
+              <div aria-hidden="true" className="youtube-link-shield youtube-title-shield" onContextMenu={(event) => event.preventDefault()} />
+              <div aria-hidden="true" className="youtube-link-shield youtube-copy-shield" onContextMenu={(event) => event.preventDefault()} />
+              <div aria-hidden="true" className="youtube-link-shield youtube-brand-shield" onContextMenu={(event) => event.preventDefault()} />
             </div>
             <div className="video-library">
               <div>
