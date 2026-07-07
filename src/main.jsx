@@ -59,7 +59,7 @@ function App() {
       setPlaylists(playlistData);
       setStats(dashboardData);
       if (!videoData.some((video) => video.youtube_video_id === selectedVideoId)) {
-        setSelectedVideoId(videoData[0]?.youtube_video_id || DEFAULT_VIDEO_ID);
+        setSelectedVideoId(videoData[0]?.youtube_video_id || "");
       }
     } catch (error) {
       setApiError(error.message);
@@ -1164,9 +1164,10 @@ function WatchArea({ videos, playlists, isLoading, selectedVideoId, selectedVide
   const visibleVideos = (activePlaylist ? activePlaylist.videos : videos).filter((video) => video.is_active);
   const activeVideoId = visibleVideos.some((video) => video.youtube_video_id === selectedVideoId)
     ? selectedVideoId
-    : visibleVideos[0]?.youtube_video_id || DEFAULT_VIDEO_ID;
-  const activeVideo = visibleVideos.find((video) => video.youtube_video_id === activeVideoId) || selectedVideo;
+    : visibleVideos[0]?.youtube_video_id || "";
+  const activeVideo = visibleVideos.find((video) => video.youtube_video_id === activeVideoId);
   const showSkeleton = isLoading && !videos.length;
+  const hasVisibleVideo = Boolean(activeVideoId && activeVideo);
 
   useEffect(() => {
     function syncFullscreenState() {
@@ -1210,6 +1211,21 @@ function WatchArea({ videos, playlists, isLoading, selectedVideoId, selectedVide
                 <span className="skeleton-chip" />
                 <span className="skeleton-chip" />
                 <span className="skeleton-chip" />
+              </div>
+            </div>
+          </>
+        ) : !hasVisibleVideo ? (
+          <>
+            <div className="video-frame empty-video-frame">
+              <div>
+                <h2>ยังไม่มีคลิปให้ดู</h2>
+                <p>เมื่อ admin เพิ่มหรือเปิดวิดีโอให้ user เห็น คลิปจะแสดงตรงนี้</p>
+              </div>
+            </div>
+            <div className="video-library">
+              <div>
+                <h2>ไม่มีวิดีโอ</h2>
+                <p>ยังไม่มีคลิปที่เปิดให้รับชมในตอนนี้</p>
               </div>
             </div>
           </>

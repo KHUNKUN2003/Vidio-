@@ -876,6 +876,29 @@ label {
   border: 0;
 }
 
+.empty-video-frame {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  text-align: center;
+  padding: 24px;
+}
+
+.empty-video-frame div {
+  display: grid;
+  gap: 8px;
+}
+
+.empty-video-frame h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2vw, 2.2rem);
+}
+
+.empty-video-frame p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .video-frame:fullscreen {
   width: 100vw;
   height: 100vh;
@@ -908,23 +931,20 @@ label {
 
 .youtube-copy-shield {
   left: 0;
-  bottom: 0;
-  width: min(24%, 220px);
-  height: min(16%, 88px);
+  bottom: 8px;
+  width: min(12%, 96px);
+  height: min(9%, 50px);
 }
 
 .youtube-more-options-shield {
-  left: 31%;
-  bottom: 0;
-  width: 38%;
-  height: min(13%, 76px);
+  display: none;
 }
 
 .youtube-brand-shield {
   right: 74px;
-  bottom: 0;
-  width: min(26%, 340px);
-  height: min(15%, 84px);
+  bottom: 8px;
+  width: min(17%, 240px);
+  height: min(9%, 54px);
 }
 
 .player-fullscreen-button {
@@ -975,20 +995,18 @@ label {
   }
 
   .youtube-copy-shield {
-    width: 30%;
-    height: 22%;
+    width: 18%;
+    height: 12%;
   }
 
   .youtube-more-options-shield {
-    left: 28%;
-    width: 44%;
-    height: 19%;
+    display: none;
   }
 
   .youtube-brand-shield {
     right: 58px;
-    width: 34%;
-    height: 21%;
+    width: 24%;
+    height: 12%;
   }
 
   .player-fullscreen-button {
