@@ -1158,6 +1158,8 @@ function ConfirmDialog({ video, isOpen, title, message, confirmLabel = "ยื�
 
 function WatchArea({ videos, playlists, isLoading, selectedVideoId, selectedVideo, onSelect }) {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState("all");
+  const [isPlayerFullscreen, setIsPlayerFullscreen] = useState(false);
+  const videoFrameRef = useRef(null);
   const activePlaylist = playlists.find((playlist) => String(playlist.id) === selectedPlaylistId);
   const visibleVideos = (activePlaylist ? activePlaylist.videos : videos).filter((video) => video.is_active);
   const activeVideoId = visibleVideos.some((video) => video.youtube_video_id === selectedVideoId)
@@ -1165,6 +1167,31 @@ function WatchArea({ videos, playlists, isLoading, selectedVideoId, selectedVide
     : visibleVideos[0]?.youtube_video_id || DEFAULT_VIDEO_ID;
   const activeVideo = visibleVideos.find((video) => video.youtube_video_id === activeVideoId) || selectedVideo;
   const showSkeleton = isLoading && !videos.length;
+
+  useEffect(() => {
+    function syncFullscreenState() {
+      setIsPlayerFullscreen(document.fullscreenElement === videoFrameRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
+  }, []);
+
+  async function togglePlayerFullscreen() {
+    const frame = videoFrameRef.current;
+    if (!frame) return;
+
+    try {
+      if (document.fullscreenElement === frame) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      await frame.requestFullscreen();
+    } catch {
+      setIsPlayerFullscreen(false);
+    }
+  }
 
   return (
     <section className="watch-shell">
@@ -1188,12 +1215,11 @@ function WatchArea({ videos, playlists, isLoading, selectedVideoId, selectedVide
           </>
         ) : (
           <>
-            <div className="video-frame">
+            <div className={isPlayerFullscreen ? "video-frame is-player-fullscreen" : "video-frame"} ref={videoFrameRef} onContextMenu={(event) => event.preventDefault()}>
               <iframe
                 title="YouTube video player"
                 src={buildEmbedUrl(activeVideoId)}
-                allow="accelerometer; autoplay; clipboard-write 'none'; encrypted-media; fullscreen; gyroscope; picture-in-picture"
-                allowFullScreen
+                allow="accelerometer; autoplay; clipboard-write 'none'; encrypted-media; gyroscope; picture-in-picture"
                 referrerPolicy="strict-origin-when-cross-origin"
                 sandbox="allow-scripts allow-same-origin allow-presentation"
               />
@@ -1201,6 +1227,32 @@ function WatchArea({ videos, playlists, isLoading, selectedVideoId, selectedVide
               <div aria-hidden="true" className="youtube-link-shield youtube-copy-shield" onContextMenu={(event) => event.preventDefault()} />
               <div aria-hidden="true" className="youtube-link-shield youtube-more-options-shield" onContextMenu={(event) => event.preventDefault()} />
               <div aria-hidden="true" className="youtube-link-shield youtube-brand-shield" onContextMenu={(event) => event.preventDefault()} />
+              <button
+                aria-label={isPlayerFullscreen ? "ออกจากเต็มจอ" : "เต็มจอ"}
+                className="player-fullscreen-button"
+                onClick={togglePlayerFullscreen}
+                onContextMenu={(event) => event.preventDefault()}
+                title={isPlayerFullscreen ? "ออกจากเต็มจอ" : "เต็มจอ"}
+                type="button"
+              >
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                  {isPlayerFullscreen ? (
+                    <>
+                      <path d="M9 3v6H3" />
+                      <path d="M15 3v6h6" />
+                      <path d="M9 21v-6H3" />
+                      <path d="M15 21v-6h6" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M9 3H3v6" />
+                      <path d="M15 3h6v6" />
+                      <path d="M9 21H3v-6" />
+                      <path d="M15 21h6v-6" />
+                    </>
+                  )}
+                </svg>
+              </button>
             </div>
             <div className="video-library">
               <div>
