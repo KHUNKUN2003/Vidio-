@@ -523,6 +523,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, onRefresh,
   const [toast, setToast] = useState(null);
   const [pendingDeleteVideo, setPendingDeleteVideo] = useState(null);
   const [pendingDeleteMembership, setPendingDeleteMembership] = useState(null);
+  const [pendingDeletePlaylist, setPendingDeletePlaylist] = useState(null);
   const [draggedVideoId, setDraggedVideoId] = useState(null);
   const toastTimerRef = useRef(null);
 
@@ -717,6 +718,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, onRefresh,
       setEditingPlaylistId(null);
       setPlaylistForm(emptyPlaylistForm);
     }
+    setPendingDeletePlaylist(null);
     showToast({ title: "ลบเพลย์ลิสต์แล้ว", message: `"${playlist.title}" ถูกนำออกจากรายการแล้ว`, type: "success" });
   }
 
@@ -768,6 +770,14 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, onRefresh,
         isOpen={Boolean(pendingDeleteMembership)}
         onCancel={() => setPendingDeleteMembership(null)}
         onConfirm={() => pendingDeleteMembership && deleteMembershipRequest(pendingDeleteMembership)}
+      />
+      <ConfirmDialog
+        title="ลบเพลย์ลิสต์นี้ใช่ไหม?"
+        message={pendingDeletePlaylist ? `เพลย์ลิสต์ "${pendingDeletePlaylist.title}" จะถูกนำออกจากรายการ แต่คลิปในเพลย์ลิสต์จะยังอยู่ในระบบ` : ""}
+        confirmLabel="ยืนยันลบ"
+        isOpen={Boolean(pendingDeletePlaylist)}
+        onCancel={() => setPendingDeletePlaylist(null)}
+        onConfirm={() => pendingDeletePlaylist && deletePlaylist(pendingDeletePlaylist)}
       />
       <div className="admin-panel-tabs">
         <button className={activePanel === "videos" ? "is-active" : ""} type="button" onClick={() => setActivePanel("videos")}>
@@ -898,7 +908,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, onRefresh,
           videos={videos}
           onCancel={() => { setEditingPlaylistId(null); setPlaylistForm(emptyPlaylistForm); }}
           onChange={setPlaylistForm}
-          onDelete={deletePlaylist}
+          onDelete={setPendingDeletePlaylist}
           onEdit={editPlaylist}
           onSubmit={submitPlaylist}
           onToggleVideo={togglePlaylistVideo}
