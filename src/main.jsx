@@ -927,7 +927,7 @@ function Stat({ label, value }) {
 
 function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange, onDelete, onEdit, onSubmit, onToggleVideo }) {
   return (
-    <>
+    <div className="playlist-workspace">
       <form className="editor-panel playlist-editor" onSubmit={onSubmit}>
         <div>
           <h2>{editingId ? "แก้ไขเพลย์ลิสต์" : "เพิ่มเพลย์ลิสต์"}</h2>
@@ -996,7 +996,7 @@ function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange,
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

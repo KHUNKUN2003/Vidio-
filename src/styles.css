@@ -212,16 +212,35 @@ label {
   gap: 14px;
 }
 
-.playlist-editor {
+.playlist-workspace {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.playlist-editor {
+  grid-column: auto;
 }
 
 .playlist-video-picker {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  max-height: 330px;
+  overflow: auto;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgba(246, 247, 251, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.05);
 }
 
 .playlist-video-picker > span {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 8px 4px;
+  background: rgba(246, 247, 251, 0.94);
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
@@ -231,10 +250,19 @@ label {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
+  padding: 11px 12px;
+  border: 1px solid rgba(29, 29, 31, 0.08);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.64);
+  background: rgba(255, 255, 255, 0.74);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.playlist-check:hover,
+.playlist-check:has(input:checked) {
+  background: rgba(232, 242, 255, 0.92);
+  border-color: rgba(0, 110, 219, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(0, 110, 219, 0.05);
 }
 
 .playlist-check input {
@@ -547,20 +575,20 @@ label {
 
 .playlist-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .playlist-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, 0.8fr) auto;
-  gap: 14px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
   border: 1px solid rgba(255, 255, 255, 0.76);
   border-radius: 20px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
   box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.88);
-  padding: 14px;
+  padding: 16px;
 }
 
 .playlist-card > div:first-child {
@@ -580,13 +608,15 @@ label {
 }
 
 .playlist-video-preview {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-height: 30px;
 }
 
 .playlist-video-preview span {
-  max-width: 160px;
+  max-width: 220px;
   overflow: hidden;
   border-radius: 999px;
   background: rgba(232, 242, 255, 0.88);
@@ -594,6 +624,10 @@ label {
   padding: 6px 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.playlist-card .row-actions {
+  justify-content: flex-end;
 }
 
 .membership-card {
@@ -1219,6 +1253,10 @@ label {
     grid-column: 1;
   }
 
+  .playlist-workspace {
+    grid-template-columns: 1fr;
+  }
+
   .admin-panel-tabs {
     justify-content: flex-start;
     flex-wrap: wrap;
@@ -1234,6 +1272,10 @@ label {
 
   .playlist-card {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playlist-card .row-actions {
+    justify-content: flex-start;
   }
 
   .row-actions {
