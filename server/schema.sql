@@ -98,14 +98,3 @@ WHERE videos.id = ordered.id
     FROM videos existing_order
     WHERE existing_order.sort_order <> 0
   );
-
-INSERT INTO videos (title, youtube_url, youtube_video_id, description, is_active, sort_order)
-VALUES (
-  'คลิปหลัก',
-  'https://youtu.be/Xx_69DYLHt4?si=NxttEozzHn4FarWu',
-  'Xx_69DYLHt4',
-  'คลิปเริ่มต้นสำหรับถามจาก transcript',
-  TRUE,
-  0
-)
-ON CONFLICT (youtube_video_id) DO NOTHING;
