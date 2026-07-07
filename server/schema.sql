@@ -15,6 +15,26 @@ ALTER TABLE videos ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 
 CREATE INDEX IF NOT EXISTS videos_is_active_idx ON videos (is_active);
 CREATE INDEX IF NOT EXISTS videos_sort_order_idx ON videos (sort_order, created_at DESC, id DESC);
 
+CREATE TABLE IF NOT EXISTS playlists (
+  id BIGSERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS playlist_videos (
+  playlist_id BIGINT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+  video_id BIGINT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (playlist_id, video_id)
+);
+
+CREATE INDEX IF NOT EXISTS playlists_sort_order_idx ON playlists (sort_order, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS playlist_videos_video_idx ON playlist_videos (video_id);
+
 CREATE TABLE IF NOT EXISTS user_sessions (
   phone TEXT,
   identity_type TEXT NOT NULL DEFAULT 'phone',

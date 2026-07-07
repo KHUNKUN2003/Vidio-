@@ -212,6 +212,55 @@ label {
   gap: 14px;
 }
 
+.playlist-editor {
+  grid-column: 1 / -1;
+}
+
+.playlist-video-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.playlist-video-picker > span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.playlist-check {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.playlist-check input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.playlist-check span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.playlist-check strong {
+  color: var(--text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.playlist-check small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .password-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -494,6 +543,57 @@ label {
 .membership-list {
   display: grid;
   gap: 10px;
+}
+
+.playlist-list {
+  display: grid;
+  gap: 10px;
+}
+
+.playlist-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 0.8fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
+  box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  padding: 14px;
+}
+
+.playlist-card > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.playlist-card strong {
+  overflow-wrap: anywhere;
+}
+
+.playlist-card span,
+.playlist-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.playlist-video-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.playlist-video-preview span {
+  max-width: 160px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(232, 242, 255, 0.88);
+  color: var(--accent);
+  padding: 6px 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .membership-card {
@@ -800,6 +900,32 @@ label {
   gap: 8px;
 }
 
+.playlist-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(232, 232, 237, 0.62);
+  width: fit-content;
+  max-width: 100%;
+  box-shadow: inset 0 0 0 1px rgba(29, 29, 31, 0.05);
+}
+
+.playlist-selector button {
+  min-height: 34px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.playlist-selector .is-active {
+  background: var(--text);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(20, 24, 35, 0.16);
+}
+
 .video-chip.is-active {
   background: var(--accent-soft);
   color: var(--accent);
@@ -1103,6 +1229,10 @@ label {
   }
 
   .membership-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .playlist-card {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -162,6 +162,75 @@ app.get("/api/health", (_request, response) => {
 app.use("/api/videos", requireDatabase);
 app.use("/api/dashboard", requireDatabase);
 app.use("/api/memberships", requireDatabase);
+app.use("/api/playlists", requireDatabase);
+
+function normalizePlaylistPayload(input) {
+  const title = String(input?.title || "").trim();
+  const description = String(input?.description || "").trim();
+  const videoIds = Array.isArray(input?.videoIds)
+    ? input.videoIds.map((id) => String(id)).filter((id) => /^\d+$/.test(id))
+    : [];
+
+  if (!title) return { error: "Playlist title is required" };
+  if (title.length > 120) return { error: "Playlist title must be 120 characters or fewer" };
+
+  return {
+    title,
+    description,
+    videoIds: [...new Set(videoIds)],
+  };
+}
+
+async function fetchPlaylists() {
+  const result = await pool.query(
+    `SELECT
+       playlists.id,
+       playlists.title,
+       playlists.description,
+       playlists.sort_order,
+       playlists.created_at,
+       playlists.updated_at,
+       COALESCE(
+         json_agg(
+           json_build_object(
+             'id', videos.id,
+             'title', videos.title,
+             'youtube_url', videos.youtube_url,
+             'youtube_video_id', videos.youtube_video_id,
+             'description', videos.description,
+             'is_active', videos.is_active,
+             'sort_order', playlist_videos.sort_order,
+             'created_at', videos.created_at,
+             'updated_at', videos.updated_at
+           )
+           ORDER BY playlist_videos.sort_order ASC, videos.sort_order ASC, videos.created_at DESC, videos.id DESC
+         ) FILTER (WHERE videos.id IS NOT NULL),
+         '[]'::json
+       ) AS videos
+     FROM playlists
+     LEFT JOIN playlist_videos ON playlist_videos.playlist_id = playlists.id
+     LEFT JOIN videos ON videos.id = playlist_videos.video_id
+     GROUP BY playlists.id
+     ORDER BY playlists.sort_order ASC, playlists.created_at DESC, playlists.id DESC`,
+  );
+
+  return result.rows;
+}
+
+async function replacePlaylistVideos(client, playlistId, videoIds) {
+  await client.query("DELETE FROM playlist_videos WHERE playlist_id = $1", [playlistId]);
+  await Promise.all(
+    videoIds.map((videoId, index) => (
+      client.query(
+        `INSERT INTO playlist_videos (playlist_id, video_id, sort_order)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (playlist_id, video_id)
+         DO UPDATE SET sort_order = EXCLUDED.sort_order`,
+        [playlistId, videoId, index],
+      )
+    )),
+  );
+}
 
 app.post("/api/auth/admin/login", (request, response) => {
   const username = String(request.body?.username || "");
@@ -522,6 +591,94 @@ app.delete("/api/memberships/:id", requireAuth("admin"), async (request, respons
       "DELETE FROM user_sessions WHERE identity_type = 'line' AND identity_value = $1",
       [result.rows[0].line_user_id],
     );
+    response.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/playlists", async (_request, response, next) => {
+  try {
+    response.json(await fetchPlaylists());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/playlists", requireAuth("admin"), async (request, response, next) => {
+  const payload = normalizePlaylistPayload(request.body);
+  if (payload.error) {
+    response.status(400).json({ error: payload.error });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const sortOrderResult = await client.query("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort_order FROM playlists");
+    const playlistResult = await client.query(
+      `INSERT INTO playlists (title, description, sort_order)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [payload.title, payload.description, sortOrderResult.rows[0].next_sort_order],
+    );
+    await replacePlaylistVideos(client, playlistResult.rows[0].id, payload.videoIds);
+    await client.query("COMMIT");
+
+    response.status(201).json(await fetchPlaylists());
+  } catch (error) {
+    await client.query("ROLLBACK");
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+app.put("/api/playlists/:id", requireAuth("admin"), async (request, response, next) => {
+  const payload = normalizePlaylistPayload(request.body);
+  if (payload.error) {
+    response.status(400).json({ error: payload.error });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const playlistResult = await client.query(
+      `UPDATE playlists
+       SET title = $1,
+           description = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING id`,
+      [payload.title, payload.description, request.params.id],
+    );
+
+    if (!playlistResult.rowCount) {
+      await client.query("ROLLBACK");
+      response.status(404).json({ error: "Playlist not found" });
+      return;
+    }
+
+    await replacePlaylistVideos(client, request.params.id, payload.videoIds);
+    await client.query("COMMIT");
+
+    response.json(await fetchPlaylists());
+  } catch (error) {
+    await client.query("ROLLBACK");
+    next(error);
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/api/playlists/:id", requireAuth("admin"), async (request, response, next) => {
+  try {
+    const result = await pool.query("DELETE FROM playlists WHERE id = $1", [request.params.id]);
+    if (!result.rowCount) {
+      response.status(404).json({ error: "Playlist not found" });
+      return;
+    }
     response.status(204).send();
   } catch (error) {
     next(error);
