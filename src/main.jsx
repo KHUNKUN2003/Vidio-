@@ -1242,6 +1242,7 @@ function WatchArea({ videos, playlists, isLoading, selectedVideoId, selectedVide
               <div aria-hidden="true" className="youtube-link-shield youtube-title-shield" onContextMenu={(event) => event.preventDefault()} />
               <div aria-hidden="true" className="youtube-link-shield youtube-copy-shield" onContextMenu={(event) => event.preventDefault()} />
               <div aria-hidden="true" className="youtube-link-shield youtube-more-options-shield" onContextMenu={(event) => event.preventDefault()} />
+              <div aria-hidden="true" className="youtube-link-shield youtube-settings-copy-shield" onContextMenu={(event) => event.preventDefault()} />
               <div aria-hidden="true" className="youtube-link-shield youtube-brand-shield" onContextMenu={(event) => event.preventDefault()} />
               <button
                 aria-label={isPlayerFullscreen ? "ออกจากเต็มจอ" : "เต็มจอ"}

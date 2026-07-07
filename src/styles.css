@@ -940,6 +940,14 @@ label {
   display: none;
 }
 
+.youtube-settings-copy-shield {
+  left: 50%;
+  bottom: 13%;
+  width: min(42%, 500px);
+  height: min(18%, 122px);
+  transform: translateX(-50%);
+}
+
 .youtube-brand-shield {
   right: 74px;
   bottom: 8px;
@@ -1001,6 +1009,13 @@ label {
 
   .youtube-more-options-shield {
     display: none;
+  }
+
+  .youtube-settings-copy-shield {
+    left: 50%;
+    bottom: 16%;
+    width: 72%;
+    height: 20%;
   }
 
   .youtube-brand-shield {
