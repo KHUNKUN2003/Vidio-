@@ -61,7 +61,7 @@ export function buildEmbedUrl(videoId, start = 0) {
     rel: "0",
     modestbranding: "1",
     iv_load_policy: "3",
-    fs: "0",
+    fs: "1",
     playsinline: "1",
     enablejsapi: "0",
   }).forEach(([key, value]) => {

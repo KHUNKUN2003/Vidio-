@@ -4,6 +4,17 @@
       "includeFiles": "server/schema.sql"
     }
   },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Permissions-Policy",
+          "value": "clipboard-read=(), clipboard-write=()"
+        }
+      ]
+    }
+  ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/[...path].js" },
     { "handle": "filesystem" },
