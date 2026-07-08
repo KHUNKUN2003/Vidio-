@@ -991,6 +991,11 @@ if (fs.existsSync(clientIndexPath)) {
 }
 
 app.use((error, _request, response, _next) => {
+  if (error?.status === 400 && error?.type === "entity.parse.failed") {
+    response.status(400).json({ error: "Invalid JSON body" });
+    return;
+  }
+
   console.error(error);
   response.status(500).json({ error: "Internal server error" });
 });
