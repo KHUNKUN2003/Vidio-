@@ -1,15 +1,14 @@
 # Vidio+
 
-Vidio+ is a private YouTube video viewer built with React, Vite, Express, and PostgreSQL. It includes an admin dashboard for managing videos and a user login flow with phone OTP or LINE Login membership approval.
+Vidio+ is a private YouTube video viewer built with React, Vite, Express, and PostgreSQL. It includes an admin dashboard for managing videos and a user login flow with LINE Login membership approval.
 
 ## Features
 
 - Login-first experience with separated Admin and User roles
 - Admin dashboard for adding, editing, deleting, toggling visibility, and reordering videos
 - YouTube embed viewer with sharing/navigation controls visually blocked as much as the YouTube iframe allows
-- Phone OTP demo login with JWT sessions
 - LINE Login membership requests with admin approval/rejection
-- Single active user session protection for phone and LINE accounts
+- Single active user session protection for LINE accounts
 - Neon PostgreSQL support
 - Toast notifications, confirm dialogs, skeleton loading, and a clean Apple-inspired UI
 
@@ -148,7 +147,6 @@ npm test
 - Production admin login supports `ADMIN_PASSWORD_HASH` and does not need the plain admin password in env.
 - API responses include security headers, and auth/admin routes are rate-limited in memory.
 - Successful logins also set a `HttpOnly` SameSite auth cookie while keeping bearer tokens compatible with the current UI.
-- The phone OTP flow is currently a demo flow that returns `demoOtp` from the API.
 - YouTube embeds cannot be made fully private by hiding buttons alone. For stronger protection, use private video hosting or signed playback URLs.
 
 ## Project Structure

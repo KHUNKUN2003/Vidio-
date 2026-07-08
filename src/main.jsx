@@ -12,7 +12,13 @@ function authHeaders(token) {
 function App() {
   const [session, setSession] = useState(() => {
     const saved = sessionStorage.getItem("course-session");
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    const savedSession = JSON.parse(saved);
+    if (savedSession?.role === "user" && savedSession.provider !== "line") {
+      sessionStorage.removeItem("course-session");
+      return null;
+    }
+    return savedSession;
   });
   const [roleTab, setRoleTab] = useState("user");
   const [videos, setVideos] = useState([]);
@@ -237,7 +243,7 @@ function App() {
         <div className="topbar-brand">
           <img alt="" aria-hidden="true" src="/vidio-plus-icon.png" />
           <div>
-          <p className="kicker">{session.role === "admin" ? "Admin" : session.phone || session.lineName}</p>
+          <p className="kicker">{session.role === "admin" ? "Admin" : session.lineName}</p>
             <h1>Vidio+</h1>
           </div>
         </div>
@@ -285,10 +291,7 @@ function App() {
 
 function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
   const [adminMessage, setAdminMessage] = useState("");
-  const [otpMessage, setOtpMessage] = useState("");
   const [lineRequest, setLineRequest] = useState(null);
-  const [pendingPhone, setPendingPhone] = useState("");
-  const [otpStep, setOtpStep] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
@@ -384,56 +387,8 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
     onLogin({ role: "admin", token: data.token, username: data.user.username });
   }
 
-  async function submitPhone(event) {
-    event.preventDefault();
-    setOtpMessage("");
-    const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/user/request-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: String(form.get("phone") || "") }),
-    });
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      setOtpMessage(data?.error || "กรุณากรอกเบอร์โทรให้ถูกต้อง เช่น 0812345678");
-      return;
-    }
-
-    setPendingPhone(data.phone);
-    setOtpStep(true);
-    setOtpMessage(`ส่ง OTP ไปยัง ${data.phone} แล้ว (โหมดทดสอบ: ${data.demoOtp})`);
-  }
-
-  async function submitOtp(event) {
-    event.preventDefault();
-    setOtpMessage("");
-    const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/user/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        phone: pendingPhone,
-        otp: String(form.get("otp") || ""),
-      }),
-    });
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      showToast({
-        title: "เข้าสู่ระบบไม่ได้",
-        message: data?.error || "OTP ไม่ถูกต้องหรือหมดอายุ",
-        type: "error",
-      });
-      return;
-    }
-
-    onLogin({ role: "user", token: data.token, phone: data.user.phone });
-  }
-
   async function submitLineLogin(event) {
     event.preventDefault();
-    setOtpMessage("");
     window.location.href = "/api/auth/line/start";
   }
 
@@ -535,37 +490,9 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
           </form>
         ) : (
           <div className="form-stack">
-            {!otpStep ? (
-              <form className="form-stack" key="phone-form" onSubmit={submitPhone}>
-                <label>
-                  เบอร์โทรศัพท์
-                  <input name="phone" type="tel" placeholder="0812345678" required />
-                </label>
-                <button className="primary-button" type="submit">ส่ง OTP</button>
-              </form>
-            ) : (
-              <form className="form-stack" key={`otp-form-${pendingPhone}`} onSubmit={submitOtp}>
-                <label>
-                  OTP
-                  <input key={`otp-input-${pendingPhone}`} name="otp" inputMode="numeric" maxLength="6" placeholder="กรอก OTP 6 หลัก" required />
-                </label>
-                <div className="button-row">
-                  <button className="primary-button" type="submit">ยืนยัน OTP</button>
-                  <button type="button" onClick={() => { setOtpStep(false); setPendingPhone(""); }}>
-                    เปลี่ยนเบอร์
-                  </button>
-                </div>
-              </form>
-            )}
-            {!otpStep && (
-              <>
-                <div className="auth-divider"><span>หรือ</span></div>
-                <form className="form-stack" onSubmit={submitLineLogin}>
-                  <button className="line-login-button" type="submit">Login with LINE</button>
-                </form>
-              </>
-            )}
-            <p className={otpMessage.includes("ไม่") ? "form-message" : "form-message success-message"}>{otpMessage}</p>
+            <form className="form-stack" onSubmit={submitLineLogin}>
+              <button className="line-login-button" type="submit">Login with LINE</button>
+            </form>
           </div>
         )}
         <button

@@ -5,7 +5,6 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import express from "express";
 import { signJwt, verifyJwt } from "../auth-domain.mjs";
-import { generateOtp, isValidOtp, normalizePhoneNumber } from "../admin-utils.mjs";
 import { createMemoryRateLimiter, isTrustedOrigin, verifyAdminCredential } from "../security-domain.mjs";
 import {
   buildLineMembershipSessionPayload,
@@ -16,7 +15,6 @@ import {
 import {
   SESSION_IDLE_SECONDS,
   SESSION_TTL_SECONDS,
-  buildUserSessionPayload,
   getUserSessionExpiresAt,
   hasActiveUserSession,
 } from "../user-session-domain.mjs";
@@ -36,7 +34,6 @@ const clientUrl = process.env.CLIENT_URL || defaultClientUrl;
 const lineChannelId = process.env.LINE_CHANNEL_ID || "";
 const lineChannelSecret = process.env.LINE_CHANNEL_SECRET || "";
 const lineCallbackUrl = process.env.LINE_CALLBACK_URL || `${clientUrl}/api/auth/line/callback`;
-const otpStore = new Map();
 const lineOAuthStates = new Map();
 const lineLoginResults = new Map();
 const realtimeHub = createRealtimeHub();
@@ -48,8 +45,6 @@ const allowedOrigins = [
   "https://vidio-plus.vercel.app",
 ].filter(Boolean);
 const adminLoginLimiter = createMemoryRateLimiter({ limit: 8, windowMs: 15 * 60 * 1000 });
-const otpRequestLimiter = createMemoryRateLimiter({ limit: 5, windowMs: 10 * 60 * 1000 });
-const otpVerifyLimiter = createMemoryRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
 const lineLoginLimiter = createMemoryRateLimiter({ limit: 20, windowMs: 10 * 60 * 1000 });
 const adminMutationLimiter = createMemoryRateLimiter({ limit: 120, windowMs: 60 * 1000 });
 
@@ -391,97 +386,24 @@ app.post("/api/auth/admin/login", rateLimit(adminLoginLimiter, (request) => `${c
   });
 });
 
-app.post("/api/auth/user/request-otp", rateLimit(otpRequestLimiter, (request) => `${clientIp(request)}:otp-request:${request.body?.phone || ""}`), (request, response) => {
-  const phone = normalizePhoneNumber(String(request.body?.phone || ""));
-
-  if (!phone) {
-    response.status(400).json({ error: "Invalid phone number" });
-    return;
-  }
-
-  const otp = generateOtp();
-  otpStore.set(phone, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
-
-  response.json({
-    phone,
-    demoOtp: otp,
-    message: "OTP generated",
-  });
-});
-
-app.post("/api/auth/user/verify-otp", rateLimit(otpVerifyLimiter, (request) => `${clientIp(request)}:otp-verify:${request.body?.phone || ""}`), requireDatabase, async (request, response, next) => {
-  const phone = normalizePhoneNumber(String(request.body?.phone || ""));
-  const otp = String(request.body?.otp || "");
-  const pending = otpStore.get(phone);
-
-  if (!pending || pending.expiresAt < Date.now() || !isValidOtp(otp, pending.otp)) {
-    response.status(401).json({ error: "OTP is incorrect or expired" });
-    return;
-  }
-
-  try {
-    await pruneInactiveUserSessions();
-    const activeSession = await pool.query(
-      "SELECT expires_at, last_seen_at FROM user_sessions WHERE identity_type = 'phone' AND identity_value = $1",
-      [phone],
-    );
-
-    if (hasActiveUserSession(activeSession.rows[0])) {
-      response.status(409).json({ error: "บัญชีนี้กำลังใช้งานอยู่ในอุปกรณ์อื่น" });
-      return;
-    }
-
-    const sessionId = crypto.randomUUID();
-    const expiresAt = getUserSessionExpiresAt();
-    await pool.query(
-      `INSERT INTO user_sessions (phone, identity_type, identity_value, session_id, expires_at)
-       VALUES ($1, 'phone', $1, $2, $3)
-       ON CONFLICT (identity_type, identity_value)
-       DO UPDATE SET session_id = EXCLUDED.session_id,
-                     expires_at = EXCLUDED.expires_at,
-                     last_seen_at = NOW(),
-                     created_at = NOW()`,
-      [phone, sessionId, expiresAt],
-    );
-
-    otpStore.delete(phone);
-    const token = createSessionToken(buildUserSessionPayload(phone, sessionId));
-    setAuthCookie(response, token);
-    response.json({
-      token,
-      user: { role: "user", phone },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
 app.post("/api/auth/heartbeat", requireDatabase, requireAuth("user"), async (request, response, next) => {
   try {
     await pruneInactiveUserSessions();
 
-    let result = { rowCount: 0 };
-    if (request.user.phone && request.user.sessionId) {
-      result = await pool.query(
-        `UPDATE user_sessions
-         SET last_seen_at = NOW(),
-             expires_at = $3
-         WHERE identity_type = 'phone'
-           AND identity_value = $1
-           AND session_id = $2`,
-        [request.user.phone, request.user.sessionId, getUserSessionExpiresAt()],
-      );
-    } else if (request.user.provider === "line" && request.user.lineUserId && request.user.sessionId) {
-      result = await pool.query(
-        `UPDATE user_sessions
-         SET last_seen_at = NOW(),
-             expires_at = $3
-         WHERE identity_type = 'line'
-           AND identity_value = $1
-           AND session_id = $2`,
-        [request.user.lineUserId, request.user.sessionId, getUserSessionExpiresAt()],
-      );
+    if (request.user.provider !== "line" || !request.user.lineUserId || !request.user.sessionId) {
+      response.status(401).json({ error: "Session is no longer active" });
+      return;
     }
+
+    const result = await pool.query(
+      `UPDATE user_sessions
+       SET last_seen_at = NOW(),
+           expires_at = $3
+       WHERE identity_type = 'line'
+         AND identity_value = $1
+         AND session_id = $2`,
+      [request.user.lineUserId, request.user.sessionId, getUserSessionExpiresAt()],
+    );
 
     if (!result.rowCount) {
       response.status(401).json({ error: "Session is no longer active" });
@@ -496,12 +418,6 @@ app.post("/api/auth/heartbeat", requireDatabase, requireAuth("user"), async (req
 
 app.post("/api/auth/logout", requireAuth(), async (request, response, next) => {
   try {
-    if (pool && request.user.role === "user" && request.user.phone && request.user.sessionId) {
-      await pool.query(
-        "DELETE FROM user_sessions WHERE identity_type = 'phone' AND identity_value = $1 AND session_id = $2",
-        [request.user.phone, request.user.sessionId],
-      );
-    }
     if (pool && request.user.role === "user" && request.user.provider === "line" && request.user.lineUserId && request.user.sessionId) {
       await pool.query(
         "DELETE FROM user_sessions WHERE identity_type = 'line' AND identity_value = $1 AND session_id = $2",
