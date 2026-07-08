@@ -176,9 +176,12 @@ function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div>
+        <div className="topbar-brand">
+          <img alt="" aria-hidden="true" src="/vidio-plus-icon.png" />
+          <div>
           <p className="kicker">{session.role === "admin" ? "Admin" : session.phone || session.lineName}</p>
-          <h1>{session.role === "admin" ? "Vidio+" : "Private Viewer"}</h1>
+            <h1>Vidio+</h1>
+          </div>
         </div>
         <button className="ghost-button" type="button" onClick={logout}>
           ออกจากระบบ

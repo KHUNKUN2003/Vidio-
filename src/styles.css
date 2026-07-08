@@ -449,6 +449,26 @@ label {
   z-index: 10;
 }
 
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.topbar-brand img {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  object-fit: cover;
+  background: #050505;
+  box-shadow: 0 10px 28px rgba(20, 24, 35, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.topbar-brand div {
+  min-width: 0;
+}
+
 .topbar p {
   margin: 0 0 4px;
 }
@@ -1355,6 +1375,16 @@ label {
   .button-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .topbar-brand {
+    width: 100%;
+  }
+
+  .topbar-brand img {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
   }
 
   .password-field {
