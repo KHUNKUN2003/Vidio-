@@ -73,9 +73,9 @@ function applySecurityHeaders(_request, response, next) {
     [
       "default-src 'self'",
       "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https:",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self' https://vidio-plus-production.up.railway.app https://vidio-plus.vercel.app",
       "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
       "base-uri 'self'",

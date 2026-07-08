@@ -16,7 +16,7 @@
   --shadow: 0 26px 70px rgba(20, 24, 35, 0.10);
   --shadow-soft: 0 12px 38px rgba(20, 24, 35, 0.06);
   --ring: 0 0 0 4px rgba(0, 110, 219, 0.12);
-  --font-apple: "SF Pro TH", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", Tahoma, sans-serif;
+  --font-apple: "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", sans-serif;
   font-family: var(--font-apple);
 }
 

@@ -18,6 +18,8 @@ try {
   assert.match(loginResponse.headers.get("set-cookie") || "", /vidio_auth=.*HttpOnly/);
   assert.equal(loginResponse.headers.get("x-content-type-options"), "nosniff");
   assert.match(loginResponse.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
+  assert.match(loginResponse.headers.get("content-security-policy") || "", /https:\/\/fonts\.googleapis\.com/);
+  assert.match(loginResponse.headers.get("content-security-policy") || "", /https:\/\/fonts\.gstatic\.com/);
 
   const blockedResponse = await fetch(`${baseUrl}/api/auth/admin/login`, {
     method: "POST",
