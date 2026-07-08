@@ -463,7 +463,7 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
   return (
     <section className="auth-screen">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <div className="auth-card">
+      <div className={roleTab === "admin" ? "auth-card" : "auth-card user-auth-card"}>
         <div className="auth-copy">
           <p className="kicker">Private YouTube Viewer</p>
           <h1>เข้าสู่ระบบเพื่อดูคลิป</h1>

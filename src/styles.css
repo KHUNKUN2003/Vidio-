@@ -141,6 +141,10 @@ label {
   backdrop-filter: blur(22px) saturate(1.25);
 }
 
+.user-auth-card {
+  padding-bottom: 82px;
+}
+
 .auth-copy {
   display: grid;
   gap: 8px;
@@ -1363,6 +1367,10 @@ label {
   .auth-card {
     padding: 22px 22px 54px;
     border-radius: 20px;
+  }
+
+  .user-auth-card {
+    padding-bottom: 76px;
   }
 
   .admin-info-button {
