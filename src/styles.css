@@ -84,6 +84,25 @@ button:disabled {
   transform: none;
 }
 
+.action-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.button-loader {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.9;
+  animation: button-spin 760ms linear infinite;
+}
+
 input,
 textarea {
   width: 100%;
@@ -139,6 +158,7 @@ label {
   display: grid;
   gap: 22px;
   backdrop-filter: blur(22px) saturate(1.25);
+  animation: surface-in 360ms cubic-bezier(0.2, 0.86, 0.22, 1) both;
 }
 
 .user-auth-card {
@@ -260,7 +280,7 @@ label {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.74);
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .playlist-check:hover,
@@ -268,6 +288,10 @@ label {
   background: rgba(232, 242, 255, 0.92);
   border-color: rgba(0, 110, 219, 0.18);
   box-shadow: inset 0 0 0 1px rgba(0, 110, 219, 0.05);
+}
+
+.playlist-check:hover {
+  transform: translateY(-1px);
 }
 
 .playlist-check input {
@@ -300,14 +324,16 @@ label {
   border: solid #ffffff;
   border-width: 0 2px 2px 0;
   opacity: 0;
-  transform: rotate(45deg) scale(0.78);
-  transition: opacity 140ms ease, transform 160ms ease;
+  transform: rotate(45deg) scale(0.66);
+  transform-origin: center;
+  transition: opacity 130ms ease, transform 220ms cubic-bezier(0.2, 0.9, 0.18, 1.25);
 }
 
 .playlist-check:has(input:checked) .playlist-checkmark {
   background: linear-gradient(180deg, #1684f5, var(--accent));
   border-color: rgba(0, 110, 219, 0.38);
   box-shadow: 0 10px 22px rgba(0, 113, 227, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+  transform: scale(1.04);
 }
 
 .playlist-check:has(input:checked) .playlist-checkmark::after {
@@ -534,6 +560,7 @@ label {
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 18px;
   padding: 28px 32px;
+  animation: surface-in 320ms cubic-bezier(0.2, 0.86, 0.22, 1) both;
 }
 
 .admin-panel-tabs {
@@ -589,6 +616,12 @@ label {
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
   box-shadow: var(--shadow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(18px) saturate(1.12);
+}
+
+.stat-card,
+.editor-panel,
+.table-panel {
+  animation: surface-in 300ms cubic-bezier(0.2, 0.86, 0.22, 1) both;
 }
 
 .stat-card {
@@ -1103,6 +1136,11 @@ label {
   animation: toast-enter 280ms cubic-bezier(0.2, 0.86, 0.22, 1) both;
 }
 
+.toast-notice.is-leaving {
+  pointer-events: none;
+  animation: toast-exit 220ms ease both;
+}
+
 .toast-icon {
   width: 38px;
   height: 38px;
@@ -1159,7 +1197,7 @@ label {
   padding: 24px;
   background: rgba(18, 22, 32, 0.24);
   backdrop-filter: blur(12px) saturate(1.08);
-  animation: modal-fade 180ms ease both;
+  animation: modal-fade 220ms ease both;
 }
 
 .confirm-dialog {
@@ -1173,7 +1211,7 @@ label {
   box-shadow: 0 34px 90px rgba(20, 24, 35, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.92);
   padding: 24px;
   backdrop-filter: blur(24px) saturate(1.18);
-  animation: modal-rise 240ms cubic-bezier(0.2, 0.86, 0.22, 1) both;
+  animation: modal-rise 300ms cubic-bezier(0.2, 0.86, 0.22, 1) both;
 }
 
 .confirm-icon {
@@ -1229,12 +1267,24 @@ label {
 @keyframes toast-enter {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.98);
+    transform: translateY(-12px) scale(0.97);
   }
 
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
   }
 }
 
@@ -1251,12 +1301,30 @@ label {
 @keyframes modal-rise {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(12px) scale(0.985);
   }
 
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.992);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -1348,6 +1416,15 @@ label {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   .skeleton-line,
   .skeleton-pill,
   .skeleton-chip,

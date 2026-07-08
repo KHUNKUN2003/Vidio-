@@ -9,6 +9,40 @@ function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function useToastNotice() {
+  const [toast, setToast] = useState(null);
+  const hideTimerRef = useRef(null);
+  const removeTimerRef = useRef(null);
+
+  function clearToastTimers() {
+    if (hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current);
+    }
+    if (removeTimerRef.current) {
+      window.clearTimeout(removeTimerRef.current);
+    }
+  }
+
+  function dismissToast() {
+    clearToastTimers();
+    setToast((currentToast) => (currentToast ? { ...currentToast, isLeaving: true } : currentToast));
+    removeTimerRef.current = window.setTimeout(() => setToast(null), 220);
+  }
+
+  function showToast(nextToast) {
+    clearToastTimers();
+    setToast({ id: Date.now(), isLeaving: false, ...nextToast });
+    hideTimerRef.current = window.setTimeout(() => {
+      setToast((currentToast) => (currentToast ? { ...currentToast, isLeaving: true } : currentToast));
+    }, 3300);
+    removeTimerRef.current = window.setTimeout(() => setToast(null), 3600);
+  }
+
+  useEffect(() => clearToastTimers, []);
+
+  return { toast, showToast, dismissToast };
+}
+
 function App() {
   const [session, setSession] = useState(() => {
     const saved = sessionStorage.getItem("course-session");
@@ -293,24 +327,7 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
   const [adminMessage, setAdminMessage] = useState("");
   const [lineRequest, setLineRequest] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [toast, setToast] = useState(null);
-  const toastTimerRef = useRef(null);
-
-  function showToast(nextToast) {
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current);
-    }
-    setToast({ id: Date.now(), ...nextToast });
-    toastTimerRef.current = window.setTimeout(() => setToast(null), 3600);
-  }
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
+  const { toast, showToast, dismissToast } = useToastNotice();
 
   useEffect(() => {
     if (notice) showToast(notice);
@@ -462,7 +479,7 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
 
   return (
     <section className="auth-screen">
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toast={toast} onClose={dismissToast} />
       <div className={roleTab === "admin" ? "auth-card" : "auth-card user-auth-card"}>
         <div className="auth-copy">
           <p className="kicker">Private YouTube Viewer</p>
@@ -519,23 +536,14 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
   const [membershipRequests, setMembershipRequests] = useState([]);
   const [isMembershipLoading, setIsMembershipLoading] = useState(false);
-  const [toast, setToast] = useState(null);
+  const { toast, showToast, dismissToast } = useToastNotice();
   const [pendingDeleteVideo, setPendingDeleteVideo] = useState(null);
   const [pendingDeleteMembership, setPendingDeleteMembership] = useState(null);
   const [pendingDeletePlaylist, setPendingDeletePlaylist] = useState(null);
   const [draggedVideoId, setDraggedVideoId] = useState(null);
   const [busyAction, setBusyAction] = useState("");
-  const toastTimerRef = useRef(null);
   const busyActionRef = useRef("");
   const isBusy = Boolean(busyAction);
-
-  function showToast(nextToast) {
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current);
-    }
-    setToast({ id: Date.now(), ...nextToast });
-    toastTimerRef.current = window.setTimeout(() => setToast(null), 3600);
-  }
 
   function startBusy(action) {
     if (busyActionRef.current) return false;
@@ -549,14 +557,6 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
     busyActionRef.current = "";
     setBusyAction("");
   }
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
 
   async function refreshMembershipRequests(silent = false) {
     if (!silent) setIsMembershipLoading(true);
@@ -820,7 +820,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
 
   return (
     <section className="dashboard">
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toast={toast} onClose={dismissToast} />
       <ConfirmDialog
         isBusy={isBusy}
         video={pendingDeleteVideo}
@@ -909,7 +909,11 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
               <span>{form.isActive ? "สาธารณะ" : "ไม่สาธารณะ"}</span>
             </div>
             <div className="button-row">
-              <button className="primary-button" disabled={isBusy} type="submit">{editingId ? "อัปเดต" : "เพิ่ม"}</button>
+              <button className="primary-button" disabled={isBusy} type="submit">
+                <ActionLabel active={busyAction === (editingId ? `update-video-${editingId}` : "create-video")} loadingText="กำลังบันทึก">
+                  {editingId ? "อัปเดต" : "เพิ่ม"}
+                </ActionLabel>
+              </button>
               {editingId && <button disabled={isBusy} type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }}>ยกเลิก</button>}
             </div>
           </form>
@@ -959,7 +963,11 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
                   <div className="row-actions">
                     <button type="button" onClick={() => onSelect(video.youtube_video_id)}>ดู</button>
                     <button disabled={isBusy} type="button" onClick={() => editVideo(video)}>แก้ไข</button>
-                    <button className="danger-button" disabled={isBusy} type="button" onClick={() => setPendingDeleteVideo(video)}>ลบ</button>
+                    <button className="danger-button" disabled={isBusy} type="button" onClick={() => setPendingDeleteVideo(video)}>
+                      <ActionLabel active={busyAction === `delete-video-${video.id}`} loadingText="กำลังลบ">
+                        ลบ
+                      </ActionLabel>
+                    </button>
                   </div>
                 </article>
               ))}
@@ -969,6 +977,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
         </>
       ) : activePanel === "playlists" ? (
         <PlaylistPanel
+          busyAction={busyAction}
           form={playlistForm}
           editingId={editingPlaylistId}
           playlists={playlists}
@@ -983,6 +992,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
         />
       ) : (
         <MembershipRequestsPanel
+          busyAction={busyAction}
           isLoading={isMembershipLoading}
           isBusy={isBusy}
           requests={membershipRequests}
@@ -1004,7 +1014,9 @@ function Stat({ label, value }) {
   );
 }
 
-function PlaylistPanel({ form, editingId, isBusy, playlists, videos, onCancel, onChange, onDelete, onEdit, onSubmit, onToggleVideo }) {
+function PlaylistPanel({ busyAction, form, editingId, isBusy, playlists, videos, onCancel, onChange, onDelete, onEdit, onSubmit, onToggleVideo }) {
+  const saveAction = editingId ? `update-playlist-${editingId}` : "create-playlist";
+
   return (
     <div className="playlist-workspace">
       <form className="editor-panel playlist-editor" onSubmit={onSubmit}>
@@ -1041,7 +1053,11 @@ function PlaylistPanel({ form, editingId, isBusy, playlists, videos, onCancel, o
           )}
         </div>
         <div className="button-row">
-          <button className="primary-button" disabled={isBusy} type="submit">{editingId ? "อัปเดตเพลย์ลิสต์" : "เพิ่มเพลย์ลิสต์"}</button>
+          <button className="primary-button" disabled={isBusy} type="submit">
+            <ActionLabel active={busyAction === saveAction} loadingText="กำลังบันทึก">
+              {editingId ? "อัปเดตเพลย์ลิสต์" : "เพิ่มเพลย์ลิสต์"}
+            </ActionLabel>
+          </button>
           {editingId && <button disabled={isBusy} type="button" onClick={onCancel}>ยกเลิก</button>}
         </div>
       </form>
@@ -1069,7 +1085,11 @@ function PlaylistPanel({ form, editingId, isBusy, playlists, videos, onCancel, o
               </div>
               <div className="row-actions">
                 <button disabled={isBusy} type="button" onClick={() => onEdit(playlist)}>แก้ไข</button>
-                <button className="danger-button" disabled={isBusy} type="button" onClick={() => onDelete(playlist)}>ลบ</button>
+                <button className="danger-button" disabled={isBusy} type="button" onClick={() => onDelete(playlist)}>
+                  <ActionLabel active={busyAction === `delete-playlist-${playlist.id}`} loadingText="กำลังลบ">
+                    ลบ
+                  </ActionLabel>
+                </button>
               </div>
             </article>
           )) : (
@@ -1081,7 +1101,7 @@ function PlaylistPanel({ form, editingId, isBusy, playlists, videos, onCancel, o
   );
 }
 
-function MembershipRequestsPanel({ isLoading, isBusy, requests, onRefresh, onUpdateStatus, onDelete }) {
+function MembershipRequestsPanel({ busyAction, isLoading, isBusy, requests, onRefresh, onUpdateStatus, onDelete }) {
   const pendingCount = requests.filter((request) => request.status === "pending").length;
 
   return (
@@ -1113,7 +1133,9 @@ function MembershipRequestsPanel({ isLoading, isBusy, requests, onRefresh, onUpd
                 type="button"
                 onClick={() => onUpdateStatus(request, "approved")}
               >
-                อนุมัติ
+                <ActionLabel active={busyAction === `membership-approved-${request.id}`} loadingText="กำลังอนุมัติ">
+                  อนุมัติ
+                </ActionLabel>
               </button>
               <button
                 className="danger-button"
@@ -1121,10 +1143,14 @@ function MembershipRequestsPanel({ isLoading, isBusy, requests, onRefresh, onUpd
                 type="button"
                 onClick={() => onUpdateStatus(request, "rejected")}
               >
-                ปฏิเสธ
+                <ActionLabel active={busyAction === `membership-rejected-${request.id}`} loadingText="กำลังปฏิเสธ">
+                  ปฏิเสธ
+                </ActionLabel>
               </button>
               <button disabled={isBusy} type="button" onClick={() => onDelete(request)}>
-                ลบคำขอ
+                <ActionLabel active={busyAction === `delete-membership-${request.id}`} loadingText="กำลังลบ">
+                  ลบคำขอ
+                </ActionLabel>
               </button>
             </div>
           </article>
@@ -1181,7 +1207,7 @@ function Toast({ toast, onClose }) {
   if (!toast) return null;
 
   return (
-    <div className={`toast-notice toast-${toast.type}`} role="status" aria-live="polite">
+    <div className={`toast-notice toast-${toast.type}${toast.isLeaving ? " is-leaving" : ""}`} role="status" aria-live="polite">
       <span className="toast-icon" aria-hidden="true">
         {toast.type === "success" ? "✓" : "!"}
       </span>
@@ -1193,6 +1219,17 @@ function Toast({ toast, onClose }) {
         ×
       </button>
     </div>
+  );
+}
+
+function ActionLabel({ active, loadingText, children }) {
+  if (!active) return children;
+
+  return (
+    <span className="action-label">
+      <span className="button-loader" aria-hidden="true" />
+      <span>{loadingText}</span>
+    </span>
   );
 }
 
@@ -1220,7 +1257,11 @@ function ConfirmDialog({ video, isOpen, title, message, kicker = "Confirm Delete
         </div>
         <div className="confirm-actions">
           <button disabled={isBusy} type="button" onClick={onCancel}>ยกเลิก</button>
-          <button className="danger-confirm-button" disabled={isBusy} type="button" onClick={onConfirm}>{confirmLabel}</button>
+          <button className="danger-confirm-button" disabled={isBusy} type="button" onClick={onConfirm}>
+            <ActionLabel active={isBusy} loadingText="กำลังทำรายการ">
+              {confirmLabel}
+            </ActionLabel>
+          </button>
         </div>
       </section>
     </div>
