@@ -38,8 +38,8 @@ function App() {
     }
   }
 
-  async function refreshData() {
-    setIsLoading(true);
+  async function refreshData({ silent = false } = {}) {
+    if (!silent) setIsLoading(true);
     try {
       setApiError("");
       const [videoResponse, dashboardResponse, playlistResponse] = await Promise.all([
@@ -63,11 +63,13 @@ function App() {
       }
     } catch (error) {
       setApiError(error.message);
-      setVideos([]);
-      setPlaylists([]);
-      setStats({ total: 0, active: 0, inactive: 0 });
+      if (!silent) {
+        setVideos([]);
+        setPlaylists([]);
+        setStats({ total: 0, active: 0, inactive: 0 });
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }
 
@@ -88,8 +90,12 @@ function App() {
   }
 
   useEffect(() => {
-    if (session) refreshData();
-  }, [session]);
+    if (!session) return undefined;
+
+    refreshData();
+    const intervalId = window.setInterval(() => refreshData({ silent: true }), 5000);
+    return () => window.clearInterval(intervalId);
+  }, [session, selectedVideoId]);
 
   useEffect(() => {
     if (session?.role !== "user" || !session.token) return undefined;
@@ -788,7 +794,6 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, onRefresh,
         </button>
         <button className={activePanel === "playlists" ? "is-active" : ""} type="button" onClick={() => setActivePanel("playlists")}>
           เพลย์ลิสต์
-          {playlists.length > 0 && <span>{playlists.length}</span>}
         </button>
         <button className={activePanel === "requests" ? "is-active" : ""} type="button" onClick={() => setActivePanel("requests")}>
           คำขอสมาชิก

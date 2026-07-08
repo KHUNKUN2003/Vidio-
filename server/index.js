@@ -1,6 +1,8 @@
 import "dotenv/config";
 import crypto from "node:crypto";
-import { pathToFileURL } from "node:url";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import express from "express";
 import { signJwt, verifyJwt } from "../auth-domain.mjs";
 import { generateOtp, isAdminCredential, isValidOtp, normalizePhoneNumber } from "../admin-utils.mjs";
@@ -22,6 +24,9 @@ import { ensureSchema, pool, requireDatabase } from "./db.js";
 
 export const app = express();
 const port = Number(process.env.PORT || 4174);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const clientDistDir = path.resolve(__dirname, "../dist");
+const clientIndexPath = path.join(clientDistDir, "index.html");
 const jwtSecret = process.env.JWT_SECRET || "course-dashboard-dev-secret";
 const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || "";
 const defaultClientUrl = vercelUrl ? `https://${vercelUrl}` : "http://127.0.0.1:5173";
@@ -818,6 +823,13 @@ app.delete("/api/videos/:id", requireAuth("admin"), async (request, response, ne
   }
 });
 
+if (fs.existsSync(clientIndexPath)) {
+  app.use(express.static(clientDistDir));
+  app.get(/^(?!\/api\/).*/, (_request, response) => {
+    response.sendFile(clientIndexPath);
+  });
+}
+
 app.use((error, _request, response, _next) => {
   console.error(error);
   response.status(500).json({ error: "Internal server error" });
@@ -832,8 +844,8 @@ const isMainModule = process.argv[1] && import.meta.url === pathToFileURL(proces
 if (isMainModule) {
   initializeDatabase()
     .then(() => {
-      app.listen(port, "127.0.0.1", () => {
-        console.log(`API server running on http://127.0.0.1:${port}`);
+      app.listen(port, "0.0.0.0", () => {
+        console.log(`Server running on http://0.0.0.0:${port}`);
       });
     })
     .catch((error) => {
