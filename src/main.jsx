@@ -597,7 +597,10 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
   const [pendingDeleteMembership, setPendingDeleteMembership] = useState(null);
   const [pendingDeletePlaylist, setPendingDeletePlaylist] = useState(null);
   const [draggedVideoId, setDraggedVideoId] = useState(null);
+  const [busyAction, setBusyAction] = useState("");
   const toastTimerRef = useRef(null);
+  const busyActionRef = useRef("");
+  const isBusy = Boolean(busyAction);
 
   function showToast(nextToast) {
     if (toastTimerRef.current) {
@@ -605,6 +608,19 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
     }
     setToast({ id: Date.now(), ...nextToast });
     toastTimerRef.current = window.setTimeout(() => setToast(null), 3600);
+  }
+
+  function startBusy(action) {
+    if (busyActionRef.current) return false;
+    busyActionRef.current = action;
+    setBusyAction(action);
+    return true;
+  }
+
+  function finishBusy(action) {
+    if (busyActionRef.current !== action) return;
+    busyActionRef.current = "";
+    setBusyAction("");
   }
 
   useEffect(() => {
@@ -647,65 +663,84 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
   }, [realtimeEvent]);
 
   async function updateMembershipStatus(request, status) {
-    const response = await fetch(`/api/memberships/${request.id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", ...authHeaders(token) },
-      body: JSON.stringify({ status }),
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) {
-      showToast({ title: "อัปเดตคำขอไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
-      return;
-    }
+    const action = `membership-${status}-${request.id}`;
+    if (!startBusy(action)) return;
+    try {
+      const response = await fetch(`/api/memberships/${request.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        showToast({ title: "อัปเดตคำขอไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
+        return;
+      }
 
-    setMembershipRequests((requests) => requests.map((item) => (item.id === data.id ? data : item)));
-    showToast({
-      title: status === "approved" ? "อนุมัติสมาชิกแล้ว" : "ปฏิเสธคำขอแล้ว",
-      message: `${request.line_name} ถูกอัปเดตเป็น ${status}`,
-      type: "success",
-    });
+      setMembershipRequests((requests) => requests.map((item) => (item.id === data.id ? data : item)));
+      showToast({
+        title: status === "approved" ? "อนุมัติสมาชิกแล้ว" : "ปฏิเสธคำขอแล้ว",
+        message: `${request.line_name} ถูกอัปเดตเป็น ${status}`,
+        type: "success",
+      });
+    } finally {
+      finishBusy(action);
+    }
   }
 
   async function deleteMembershipRequest(request) {
-    const response = await fetch(`/api/memberships/${request.id}`, {
-      method: "DELETE",
-      headers: authHeaders(token),
-    });
+    const action = `delete-membership-${request.id}`;
+    if (!startBusy(action)) return;
+    try {
+      const response = await fetch(`/api/memberships/${request.id}`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => null);
-      showToast({ title: "ลบคำขอไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
-      return;
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        showToast({ title: "ลบคำขอไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
+        return;
+      }
+
+      setMembershipRequests((requests) => requests.filter((item) => item.id !== request.id));
+      setPendingDeleteMembership(null);
+      showToast({ title: "ลบคำขอแล้ว", message: `คำขอของ ${request.line_name} ถูกนำออกจากรายการแล้ว`, type: "success" });
+    } finally {
+      finishBusy(action);
     }
-
-    setMembershipRequests((requests) => requests.filter((item) => item.id !== request.id));
-    setPendingDeleteMembership(null);
-    showToast({ title: "ลบคำขอแล้ว", message: `คำขอของ ${request.line_name} ถูกนำออกจากรายการแล้ว`, type: "success" });
   }
 
   async function submitVideo(event) {
     event.preventDefault();
-    const endpoint = editingId ? `/api/videos/${editingId}` : "/api/videos";
-    const method = editingId ? "PUT" : "POST";
-    const response = await fetch(endpoint, {
-      method,
-      headers: { "Content-Type": "application/json", ...authHeaders(token) },
-      body: JSON.stringify(form),
-    });
-    const data = response.status === 204 ? null : await response.json().catch(() => null);
-    if (!response.ok) {
-      const errorMessage = data?.error || "บันทึกวิดีโอไม่สำเร็จ";
-      showToast({ title: "ไม่สำเร็จ", message: errorMessage, type: "error" });
-      return;
+    const action = editingId ? `update-video-${editingId}` : "create-video";
+    if (!startBusy(action)) return;
+    try {
+      const currentEditingId = editingId;
+      const endpoint = currentEditingId ? `/api/videos/${currentEditingId}` : "/api/videos";
+      const method = currentEditingId ? "PUT" : "POST";
+      const response = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        body: JSON.stringify(form),
+      });
+      const data = response.status === 204 ? null : await response.json().catch(() => null);
+      if (!response.ok) {
+        const errorMessage = data?.error || "บันทึกวิดีโอไม่สำเร็จ";
+        showToast({ title: "ไม่สำเร็จ", message: errorMessage, type: "error" });
+        return;
+      }
+      setForm(emptyForm);
+      setEditingId(null);
+      showToast({
+        title: currentEditingId ? "อัปเดตสำเร็จ" : "อัปโหลดสำเร็จ",
+        message: currentEditingId ? "บันทึกการแก้ไขวิดีโอเรียบร้อยแล้ว" : "เพิ่มคลิปใหม่เข้า dashboard เรียบร้อยแล้ว",
+        type: "success",
+      });
+      await onRefresh();
+    } finally {
+      finishBusy(action);
     }
-    setForm(emptyForm);
-    setEditingId(null);
-    showToast({
-      title: editingId ? "อัปเดตสำเร็จ" : "อัปโหลดสำเร็จ",
-      message: editingId ? "บันทึกการแก้ไขวิดีโอเรียบร้อยแล้ว" : "เพิ่มคลิปใหม่เข้า dashboard เรียบร้อยแล้ว",
-      type: "success",
-    });
-    await onRefresh();
   }
 
   function editVideo(video) {
@@ -720,17 +755,23 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
   }
 
   async function deleteVideo(video) {
-    const response = await fetch(`/api/videos/${video.id}`, {
-      method: "DELETE",
-      headers: authHeaders(token),
-    });
-    if (!response.ok) {
-      showToast({ title: "ลบไม่สำเร็จ", message: "กรุณาลองใหม่อีกครั้ง", type: "error" });
-      return;
+    const action = `delete-video-${video.id}`;
+    if (!startBusy(action)) return;
+    try {
+      const response = await fetch(`/api/videos/${video.id}`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
+      if (!response.ok) {
+        showToast({ title: "ลบไม่สำเร็จ", message: "กรุณาลองใหม่อีกครั้ง", type: "error" });
+        return;
+      }
+      setPendingDeleteVideo(null);
+      showToast({ title: "ลบวิดีโอแล้ว", message: `"${video.title}" ถูกนำออกจากรายการแล้ว`, type: "success" });
+      await onRefresh();
+    } finally {
+      finishBusy(action);
     }
-    setPendingDeleteVideo(null);
-    showToast({ title: "ลบวิดีโอแล้ว", message: `"${video.title}" ถูกนำออกจากรายการแล้ว`, type: "success" });
-    await onRefresh();
   }
 
   function togglePlaylistVideo(videoId) {
@@ -755,52 +796,66 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
 
   async function submitPlaylist(event) {
     event.preventDefault();
-    const endpoint = editingPlaylistId ? `/api/playlists/${editingPlaylistId}` : "/api/playlists";
-    const method = editingPlaylistId ? "PUT" : "POST";
-    const response = await fetch(endpoint, {
-      method,
-      headers: { "Content-Type": "application/json", ...authHeaders(token) },
-      body: JSON.stringify(playlistForm),
-    });
-    const data = await response.json().catch(() => null);
+    const action = editingPlaylistId ? `update-playlist-${editingPlaylistId}` : "create-playlist";
+    if (!startBusy(action)) return;
+    try {
+      const currentEditingPlaylistId = editingPlaylistId;
+      const endpoint = currentEditingPlaylistId ? `/api/playlists/${currentEditingPlaylistId}` : "/api/playlists";
+      const method = currentEditingPlaylistId ? "PUT" : "POST";
+      const response = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json", ...authHeaders(token) },
+        body: JSON.stringify(playlistForm),
+      });
+      const data = await response.json().catch(() => null);
 
-    if (!response.ok) {
-      showToast({ title: "บันทึกเพลย์ลิสต์ไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
-      return;
+      if (!response.ok) {
+        showToast({ title: "บันทึกเพลย์ลิสต์ไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
+        return;
+      }
+
+      onPlaylistsUpdated(data);
+      setPlaylistForm(emptyPlaylistForm);
+      setEditingPlaylistId(null);
+      showToast({
+        title: currentEditingPlaylistId ? "อัปเดตเพลย์ลิสต์แล้ว" : "สร้างเพลย์ลิสต์แล้ว",
+        message: currentEditingPlaylistId ? "บันทึกการแก้ไขเพลย์ลิสต์เรียบร้อยแล้ว" : "เพิ่มเพลย์ลิสต์ใหม่เรียบร้อยแล้ว",
+        type: "success",
+      });
+    } finally {
+      finishBusy(action);
     }
-
-    onPlaylistsUpdated(data);
-    setPlaylistForm(emptyPlaylistForm);
-    setEditingPlaylistId(null);
-    showToast({
-      title: editingPlaylistId ? "อัปเดตเพลย์ลิสต์แล้ว" : "สร้างเพลย์ลิสต์แล้ว",
-      message: editingPlaylistId ? "บันทึกการแก้ไขเพลย์ลิสต์เรียบร้อยแล้ว" : "เพิ่มเพลย์ลิสต์ใหม่เรียบร้อยแล้ว",
-      type: "success",
-    });
   }
 
   async function deletePlaylist(playlist) {
-    const response = await fetch(`/api/playlists/${playlist.id}`, {
-      method: "DELETE",
-      headers: authHeaders(token),
-    });
+    const action = `delete-playlist-${playlist.id}`;
+    if (!startBusy(action)) return;
+    try {
+      const response = await fetch(`/api/playlists/${playlist.id}`, {
+        method: "DELETE",
+        headers: authHeaders(token),
+      });
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => null);
-      showToast({ title: "ลบเพลย์ลิสต์ไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
-      return;
-    }
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        showToast({ title: "ลบเพลย์ลิสต์ไม่สำเร็จ", message: data?.error || "กรุณาลองใหม่อีกครั้ง", type: "error" });
+        return;
+      }
 
-    onPlaylistsUpdated(playlists.filter((item) => item.id !== playlist.id));
-    if (editingPlaylistId === playlist.id) {
-      setEditingPlaylistId(null);
-      setPlaylistForm(emptyPlaylistForm);
+      onPlaylistsUpdated(playlists.filter((item) => item.id !== playlist.id));
+      if (editingPlaylistId === playlist.id) {
+        setEditingPlaylistId(null);
+        setPlaylistForm(emptyPlaylistForm);
+      }
+      setPendingDeletePlaylist(null);
+      showToast({ title: "ลบเพลย์ลิสต์แล้ว", message: `"${playlist.title}" ถูกนำออกจากรายการแล้ว`, type: "success" });
+    } finally {
+      finishBusy(action);
     }
-    setPendingDeletePlaylist(null);
-    showToast({ title: "ลบเพลย์ลิสต์แล้ว", message: `"${playlist.title}" ถูกนำออกจากรายการแล้ว`, type: "success" });
   }
 
   async function reorderVideos(targetVideoId) {
+    if (isBusy) return;
     if (!draggedVideoId || draggedVideoId === targetVideoId) return;
 
     const fromIndex = videos.findIndex((video) => video.id === draggedVideoId);
@@ -810,6 +865,8 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
     const nextVideos = [...videos];
     const [movedVideo] = nextVideos.splice(fromIndex, 1);
     nextVideos.splice(toIndex, 0, movedVideo);
+    const action = "reorder-videos";
+    if (!startBusy(action)) return;
     onVideosReordered(nextVideos);
 
     try {
@@ -830,6 +887,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
       showToast({ title: "บันทึกลำดับแล้ว", message: "ลำดับวิดีโอถูกอัปเดตเรียบร้อยแล้ว", type: "success" });
     } finally {
       setDraggedVideoId(null);
+      finishBusy(action);
     }
   }
 
@@ -837,34 +895,37 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
     <section className="dashboard">
       <Toast toast={toast} onClose={() => setToast(null)} />
       <ConfirmDialog
+        isBusy={isBusy}
         video={pendingDeleteVideo}
-        onCancel={() => setPendingDeleteVideo(null)}
+        onCancel={() => !isBusy && setPendingDeleteVideo(null)}
         onConfirm={() => pendingDeleteVideo && deleteVideo(pendingDeleteVideo)}
       />
       <ConfirmDialog
         title="ลบคำขอนี้ใช่ไหม?"
         message={pendingDeleteMembership ? `คำขอของ ${pendingDeleteMembership.line_name} จะถูกนำออกจากรายการคำขอสมาชิก` : ""}
         confirmLabel="ยืนยันลบ"
+        isBusy={isBusy}
         isOpen={Boolean(pendingDeleteMembership)}
-        onCancel={() => setPendingDeleteMembership(null)}
+        onCancel={() => !isBusy && setPendingDeleteMembership(null)}
         onConfirm={() => pendingDeleteMembership && deleteMembershipRequest(pendingDeleteMembership)}
       />
       <ConfirmDialog
         title="ลบเพลย์ลิสต์นี้ใช่ไหม?"
         message={pendingDeletePlaylist ? `เพลย์ลิสต์ "${pendingDeletePlaylist.title}" จะถูกนำออกจากรายการ แต่คลิปในเพลย์ลิสต์จะยังอยู่ในระบบ` : ""}
         confirmLabel="ยืนยันลบ"
+        isBusy={isBusy}
         isOpen={Boolean(pendingDeletePlaylist)}
-        onCancel={() => setPendingDeletePlaylist(null)}
+        onCancel={() => !isBusy && setPendingDeletePlaylist(null)}
         onConfirm={() => pendingDeletePlaylist && deletePlaylist(pendingDeletePlaylist)}
       />
       <div className="admin-panel-tabs">
-        <button className={activePanel === "videos" ? "is-active" : ""} type="button" onClick={() => setActivePanel("videos")}>
+        <button className={activePanel === "videos" ? "is-active" : ""} disabled={isBusy} type="button" onClick={() => setActivePanel("videos")}>
           วิดีโอ
         </button>
-        <button className={activePanel === "playlists" ? "is-active" : ""} type="button" onClick={() => setActivePanel("playlists")}>
+        <button className={activePanel === "playlists" ? "is-active" : ""} disabled={isBusy} type="button" onClick={() => setActivePanel("playlists")}>
           เพลย์ลิสต์
         </button>
-        <button className={activePanel === "requests" ? "is-active" : ""} type="button" onClick={() => setActivePanel("requests")}>
+        <button className={activePanel === "requests" ? "is-active" : ""} disabled={isBusy} type="button" onClick={() => setActivePanel("requests")}>
           คำขอสมาชิก
           {membershipRequests.filter((request) => request.status === "pending").length > 0 && (
             <span>{membershipRequests.filter((request) => request.status === "pending").length}</span>
@@ -896,21 +957,22 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
             </div>
             <label>
               ชื่อวิดีโอ
-              <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
+              <input disabled={isBusy} value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
             </label>
             <label>
               YouTube URL
-              <input value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} required />
+              <input disabled={isBusy} value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} required />
             </label>
             <label>
               คำอธิบาย
-              <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+              <textarea disabled={isBusy} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
             </label>
             <div className="switch-row">
               <button
                 aria-checked={form.isActive}
                 aria-label="เปิดให้ user เห็น"
                 className={form.isActive ? "toggle-switch is-on" : "toggle-switch"}
+                disabled={isBusy}
                 onClick={() => setForm({ ...form, isActive: !form.isActive })}
                 role="switch"
                 type="button"
@@ -920,15 +982,15 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
               <span>เปิดให้ user เห็น</span>
             </div>
             <div className="button-row">
-              <button className="primary-button" type="submit">{editingId ? "อัปเดต" : "เพิ่ม"}</button>
-              {editingId && <button type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }}>ยกเลิก</button>}
+              <button className="primary-button" disabled={isBusy} type="submit">{editingId ? "อัปเดต" : "เพิ่ม"}</button>
+              {editingId && <button disabled={isBusy} type="button" onClick={() => { setEditingId(null); setForm(emptyForm); }}>ยกเลิก</button>}
             </div>
           </form>
 
           <div className="table-panel">
             <div className="table-heading">
               <h2>รายการวิดีโอ</h2>
-              <button type="button" onClick={onRefresh}>รีเฟรช</button>
+              <button disabled={isBusy} type="button" onClick={onRefresh}>รีเฟรช</button>
             </div>
             <div className="video-table">
               {isLoading && !videos.length ? (
@@ -939,12 +1001,12 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
               ) : videos.map((video) => (
                 <article
                   className={draggedVideoId === video.id ? "video-row is-dragging" : "video-row"}
-                  draggable
+                  draggable={!isBusy}
                   key={video.id}
                   onDragEnd={() => setDraggedVideoId(null)}
                   onDragOver={(event) => event.preventDefault()}
                   onDragStart={(event) => {
-                    if (event.target.closest(".row-actions")) {
+                    if (isBusy || event.target.closest(".row-actions")) {
                       event.preventDefault();
                       return;
                     }
@@ -958,6 +1020,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
                   <button
                     aria-label={`ลากเพื่อจัดลำดับ ${video.title}`}
                     className="drag-handle"
+                    disabled={isBusy}
                     type="button"
                   >
                     <span aria-hidden="true">⋮⋮</span>
@@ -968,8 +1031,8 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
                   </div>
                   <div className="row-actions">
                     <button type="button" onClick={() => onSelect(video.youtube_video_id)}>ดู</button>
-                    <button type="button" onClick={() => editVideo(video)}>แก้ไข</button>
-                    <button className="danger-button" type="button" onClick={() => setPendingDeleteVideo(video)}>ลบ</button>
+                    <button disabled={isBusy} type="button" onClick={() => editVideo(video)}>แก้ไข</button>
+                    <button className="danger-button" disabled={isBusy} type="button" onClick={() => setPendingDeleteVideo(video)}>ลบ</button>
                   </div>
                 </article>
               ))}
@@ -987,12 +1050,14 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
           onChange={setPlaylistForm}
           onDelete={setPendingDeletePlaylist}
           onEdit={editPlaylist}
+          isBusy={isBusy}
           onSubmit={submitPlaylist}
           onToggleVideo={togglePlaylistVideo}
         />
       ) : (
         <MembershipRequestsPanel
           isLoading={isMembershipLoading}
+          isBusy={isBusy}
           requests={membershipRequests}
           onRefresh={refreshMembershipRequests}
           onUpdateStatus={updateMembershipStatus}
@@ -1012,7 +1077,7 @@ function Stat({ label, value }) {
   );
 }
 
-function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange, onDelete, onEdit, onSubmit, onToggleVideo }) {
+function PlaylistPanel({ form, editingId, isBusy, playlists, videos, onCancel, onChange, onDelete, onEdit, onSubmit, onToggleVideo }) {
   return (
     <div className="playlist-workspace">
       <form className="editor-panel playlist-editor" onSubmit={onSubmit}>
@@ -1022,11 +1087,11 @@ function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange,
         </div>
         <label>
           ชื่อเพลย์ลิสต์
-          <input value={form.title} onChange={(event) => onChange({ ...form, title: event.target.value })} required />
+          <input disabled={isBusy} value={form.title} onChange={(event) => onChange({ ...form, title: event.target.value })} required />
         </label>
         <label>
           คำอธิบาย
-          <textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} />
+          <textarea disabled={isBusy} value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} />
         </label>
         <div className="playlist-video-picker">
           <span>วิดีโอในเพลย์ลิสต์</span>
@@ -1034,6 +1099,7 @@ function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange,
             <label className="playlist-check" key={video.id}>
               <input
                 checked={form.videoIds.includes(String(video.id))}
+                disabled={isBusy}
                 onChange={() => onToggleVideo(video.id)}
                 type="checkbox"
               />
@@ -1047,8 +1113,8 @@ function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange,
           )}
         </div>
         <div className="button-row">
-          <button className="primary-button" type="submit">{editingId ? "อัปเดตเพลย์ลิสต์" : "เพิ่มเพลย์ลิสต์"}</button>
-          {editingId && <button type="button" onClick={onCancel}>ยกเลิก</button>}
+          <button className="primary-button" disabled={isBusy} type="submit">{editingId ? "อัปเดตเพลย์ลิสต์" : "เพิ่มเพลย์ลิสต์"}</button>
+          {editingId && <button disabled={isBusy} type="button" onClick={onCancel}>ยกเลิก</button>}
         </div>
       </form>
 
@@ -1074,8 +1140,8 @@ function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange,
                 {playlist.videos.length > 4 && <span>+{playlist.videos.length - 4}</span>}
               </div>
               <div className="row-actions">
-                <button type="button" onClick={() => onEdit(playlist)}>แก้ไข</button>
-                <button className="danger-button" type="button" onClick={() => onDelete(playlist)}>ลบ</button>
+                <button disabled={isBusy} type="button" onClick={() => onEdit(playlist)}>แก้ไข</button>
+                <button className="danger-button" disabled={isBusy} type="button" onClick={() => onDelete(playlist)}>ลบ</button>
               </div>
             </article>
           )) : (
@@ -1087,7 +1153,7 @@ function PlaylistPanel({ form, editingId, playlists, videos, onCancel, onChange,
   );
 }
 
-function MembershipRequestsPanel({ isLoading, requests, onRefresh, onUpdateStatus, onDelete }) {
+function MembershipRequestsPanel({ isLoading, isBusy, requests, onRefresh, onUpdateStatus, onDelete }) {
   const pendingCount = requests.filter((request) => request.status === "pending").length;
 
   return (
@@ -1097,7 +1163,7 @@ function MembershipRequestsPanel({ isLoading, requests, onRefresh, onUpdateStatu
           <h2>คำขอสมาชิก</h2>
           <p>{pendingCount ? `มีคำขอรออนุมัติ ${pendingCount} รายการ` : "ยังไม่มีคำขอที่ต้องรออนุมัติ"}</p>
         </div>
-        <button type="button" onClick={onRefresh}>รีเฟรช</button>
+        <button disabled={isBusy} type="button" onClick={onRefresh}>รีเฟรช</button>
       </div>
       <div className="membership-list">
         {isLoading ? (
@@ -1115,7 +1181,7 @@ function MembershipRequestsPanel({ isLoading, requests, onRefresh, onUpdateStatu
             <span className={`status-pill status-${request.status}`}>{request.status}</span>
             <div className="row-actions">
               <button
-                disabled={request.status === "approved"}
+                disabled={isBusy || request.status === "approved"}
                 type="button"
                 onClick={() => onUpdateStatus(request, "approved")}
               >
@@ -1123,13 +1189,13 @@ function MembershipRequestsPanel({ isLoading, requests, onRefresh, onUpdateStatu
               </button>
               <button
                 className="danger-button"
-                disabled={request.status === "rejected"}
+                disabled={isBusy || request.status === "rejected"}
                 type="button"
                 onClick={() => onUpdateStatus(request, "rejected")}
               >
                 ปฏิเสธ
               </button>
-              <button type="button" onClick={() => onDelete(request)}>
+              <button disabled={isBusy} type="button" onClick={() => onDelete(request)}>
                 ลบคำขอ
               </button>
             </div>
@@ -1202,7 +1268,7 @@ function Toast({ toast, onClose }) {
   );
 }
 
-function ConfirmDialog({ video, isOpen, title, message, kicker = "Confirm Delete", confirmLabel = "ยืนยันลบ", onCancel, onConfirm }) {
+function ConfirmDialog({ video, isOpen, title, message, kicker = "Confirm Delete", confirmLabel = "ยืนยันลบ", isBusy = false, onCancel, onConfirm }) {
   const shouldShow = Boolean(video) || isOpen;
   if (!shouldShow) return null;
 
@@ -1225,8 +1291,8 @@ function ConfirmDialog({ video, isOpen, title, message, kicker = "Confirm Delete
           <p>{dialogMessage}</p>
         </div>
         <div className="confirm-actions">
-          <button type="button" onClick={onCancel}>ยกเลิก</button>
-          <button className="danger-confirm-button" type="button" onClick={onConfirm}>{confirmLabel}</button>
+          <button disabled={isBusy} type="button" onClick={onCancel}>ยกเลิก</button>
+          <button className="danger-confirm-button" disabled={isBusy} type="button" onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </section>
     </div>
