@@ -54,9 +54,10 @@ const lineLoginLimiter = createMemoryRateLimiter({ limit: 20, windowMs: 10 * 60 
 const adminMutationLimiter = createMemoryRateLimiter({ limit: 120, windowMs: 60 * 1000 });
 
 app.set("trust proxy", 1);
-app.use(express.json());
+app.disable("x-powered-by");
 app.use(applySecurityHeaders);
 app.use(rejectUntrustedOrigin);
+app.use(express.json());
 
 function createSessionToken(payload) {
   return signJwt(payload, jwtSecret, { expiresInSeconds: SESSION_TTL_SECONDS });

@@ -26,6 +26,14 @@ try {
   });
 
   assert.equal(blockedResponse.status, 403);
+
+  const blockedBeforeJsonParseResponse = await fetch(`${baseUrl}/api/auth/admin/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "https://evil.example" },
+    body: "{not-json",
+  });
+
+  assert.equal(blockedBeforeJsonParseResponse.status, 403);
   console.log("server-security tests passed");
 } finally {
   server.close();
