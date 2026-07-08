@@ -5,7 +5,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import express from "express";
 import { signJwt, verifyJwt } from "../auth-domain.mjs";
-import { generateOtp, isAdminCredential, isValidOtp, normalizePhoneNumber } from "../admin-utils.mjs";
+import { generateOtp, isValidOtp, normalizePhoneNumber } from "../admin-utils.mjs";
+import { createMemoryRateLimiter, isTrustedOrigin, verifyAdminCredential } from "../security-domain.mjs";
 import {
   buildLineMembershipSessionPayload,
   canWatchWithMembership,
@@ -39,11 +40,127 @@ const otpStore = new Map();
 const lineOAuthStates = new Map();
 const lineLoginResults = new Map();
 const realtimeHub = createRealtimeHub();
+const authCookieName = "vidio_auth";
+const isProduction = process.env.NODE_ENV === "production";
+const allowedOrigins = [
+  clientUrl,
+  "https://vidio-plus-production.up.railway.app",
+  "https://vidio-plus.vercel.app",
+].filter(Boolean);
+const adminLoginLimiter = createMemoryRateLimiter({ limit: 8, windowMs: 15 * 60 * 1000 });
+const otpRequestLimiter = createMemoryRateLimiter({ limit: 5, windowMs: 10 * 60 * 1000 });
+const otpVerifyLimiter = createMemoryRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
+const lineLoginLimiter = createMemoryRateLimiter({ limit: 20, windowMs: 10 * 60 * 1000 });
+const adminMutationLimiter = createMemoryRateLimiter({ limit: 120, windowMs: 60 * 1000 });
 
+app.set("trust proxy", 1);
 app.use(express.json());
+app.use(applySecurityHeaders);
+app.use(rejectUntrustedOrigin);
 
 function createSessionToken(payload) {
   return signJwt(payload, jwtSecret, { expiresInSeconds: SESSION_TTL_SECONDS });
+}
+
+function applySecurityHeaders(_request, response, next) {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "no-referrer");
+  response.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), clipboard-read=(), clipboard-write=()");
+  response.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://vidio-plus-production.up.railway.app https://vidio-plus.vercel.app",
+      "frame-src https://www.youtube-nocookie.com https://www.youtube.com",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join("; "),
+  );
+  next();
+}
+
+function rejectUntrustedOrigin(request, response, next) {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
+    next();
+    return;
+  }
+
+  const requestOrigin = `${request.protocol}://${request.get("host")}`;
+  const origins = [...new Set([...allowedOrigins, requestOrigin])];
+  if (!isTrustedOrigin(request.get("origin") || "", origins)) {
+    response.status(403).json({ error: "Untrusted origin" });
+    return;
+  }
+
+  next();
+}
+
+function parseCookies(cookieHeader) {
+  try {
+    return Object.fromEntries(
+      String(cookieHeader || "")
+        .split(";")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .map((part) => {
+          const separatorIndex = part.indexOf("=");
+          if (separatorIndex === -1) return [part, ""];
+          return [
+            decodeURIComponent(part.slice(0, separatorIndex)),
+            decodeURIComponent(part.slice(separatorIndex + 1)),
+          ];
+        }),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function getAuthToken(request) {
+  const header = request.headers.authorization || "";
+  if (header.startsWith("Bearer ")) return header.slice("Bearer ".length);
+  return parseCookies(request.headers.cookie)[authCookieName] || "";
+}
+
+function setAuthCookie(response, token) {
+  const secure = isProduction ? "; Secure" : "";
+  response.setHeader(
+    "Set-Cookie",
+    `${authCookieName}=${encodeURIComponent(token)}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
+  );
+}
+
+function clearAuthCookie(response) {
+  const secure = isProduction ? "; Secure" : "";
+  response.setHeader(
+    "Set-Cookie",
+    `${authCookieName}=; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=0`,
+  );
+}
+
+function clientIp(request) {
+  return request.ip || request.headers["x-forwarded-for"] || request.socket?.remoteAddress || "anonymous";
+}
+
+function rateLimit(limiter, keyFactory) {
+  return (request, response, next) => {
+    const key = keyFactory(request);
+    const result = limiter.consume(key);
+    response.setHeader("RateLimit-Limit", String(result.limit));
+    response.setHeader("RateLimit-Remaining", String(result.remaining));
+    response.setHeader("RateLimit-Reset", String(Math.ceil(result.resetAt / 1000)));
+    if (!result.allowed) {
+      response.status(429).json({ error: "Too many requests. Please try again later." });
+      return;
+    }
+    next();
+  };
 }
 
 function isLineLoginConfigured() {
@@ -148,8 +265,7 @@ async function upsertLineMembershipRequest({ lineUserId, lineName }) {
 
 function requireAuth(role) {
   return (request, response, next) => {
-    const header = request.headers.authorization || "";
-    const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
+    const token = getAuthToken(request);
     const payload = verifyJwt(token, jwtSecret);
 
     if (!payload || (role && payload.role !== role)) {
@@ -174,6 +290,20 @@ app.use("/api/videos", requireDatabase);
 app.use("/api/dashboard", requireDatabase);
 app.use("/api/memberships", requireDatabase);
 app.use("/api/playlists", requireDatabase);
+app.use(
+  ["/api/videos", "/api/memberships", "/api/playlists"],
+  (request, response, next) => {
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
+      next();
+      return;
+    }
+    rateLimit(adminMutationLimiter, (innerRequest) => `${clientIp(innerRequest)}:admin-mutation:${innerRequest.path}`)(
+      request,
+      response,
+      next,
+    );
+  },
+);
 
 function normalizePlaylistPayload(input) {
   const title = String(input?.title || "").trim();
@@ -243,22 +373,24 @@ async function replacePlaylistVideos(client, playlistId, videoIds) {
   );
 }
 
-app.post("/api/auth/admin/login", (request, response) => {
+app.post("/api/auth/admin/login", rateLimit(adminLoginLimiter, (request) => `${clientIp(request)}:admin:${request.body?.username || ""}`), (request, response) => {
   const username = String(request.body?.username || "");
   const password = String(request.body?.password || "");
 
-  if (!isAdminCredential(username, password)) {
+  if (!verifyAdminCredential(username, password)) {
     response.status(401).json({ error: "Username or password is incorrect" });
     return;
   }
 
+  const token = createSessionToken({ role: "admin", sub: "admin" });
+  setAuthCookie(response, token);
   response.json({
-    token: createSessionToken({ role: "admin", sub: "admin" }),
+    token,
     user: { role: "admin", username: "admin" },
   });
 });
 
-app.post("/api/auth/user/request-otp", (request, response) => {
+app.post("/api/auth/user/request-otp", rateLimit(otpRequestLimiter, (request) => `${clientIp(request)}:otp-request:${request.body?.phone || ""}`), (request, response) => {
   const phone = normalizePhoneNumber(String(request.body?.phone || ""));
 
   if (!phone) {
@@ -276,7 +408,7 @@ app.post("/api/auth/user/request-otp", (request, response) => {
   });
 });
 
-app.post("/api/auth/user/verify-otp", requireDatabase, async (request, response, next) => {
+app.post("/api/auth/user/verify-otp", rateLimit(otpVerifyLimiter, (request) => `${clientIp(request)}:otp-verify:${request.body?.phone || ""}`), requireDatabase, async (request, response, next) => {
   const phone = normalizePhoneNumber(String(request.body?.phone || ""));
   const otp = String(request.body?.otp || "");
   const pending = otpStore.get(phone);
@@ -312,8 +444,10 @@ app.post("/api/auth/user/verify-otp", requireDatabase, async (request, response,
     );
 
     otpStore.delete(phone);
+    const token = createSessionToken(buildUserSessionPayload(phone, sessionId));
+    setAuthCookie(response, token);
     response.json({
-      token: createSessionToken(buildUserSessionPayload(phone, sessionId)),
+      token,
       user: { role: "user", phone },
     });
   } catch (error) {
@@ -373,13 +507,14 @@ app.post("/api/auth/logout", requireAuth(), async (request, response, next) => {
         [request.user.lineUserId, request.user.sessionId],
       );
     }
+    clearAuthCookie(response);
     response.status(204).send();
   } catch (error) {
     next(error);
   }
 });
 
-app.post("/api/auth/line/request", requireDatabase, async (request, response, next) => {
+app.post("/api/auth/line/request", rateLimit(lineLoginLimiter, (request) => `${clientIp(request)}:line-request:${request.body?.lineUserId || ""}`), requireDatabase, async (request, response, next) => {
   const payload = normalizeLineMembershipPayload(request.body);
   if (payload.error) {
     response.status(400).json({ error: payload.error });
@@ -393,13 +528,14 @@ app.post("/api/auth/line/request", requireDatabase, async (request, response, ne
     });
     const authResult = await buildLineAuthResult(membershipRequest, { enforceSingleSession: true });
     realtimeHub.broadcast("memberships");
+    if (authResult.token) setAuthCookie(response, authResult.token);
     response.status(authResult.statusCode || 201).json(authResult);
   } catch (error) {
     next(error);
   }
 });
 
-app.get("/api/auth/line/start", requireDatabase, (_request, response) => {
+app.get("/api/auth/line/start", rateLimit(lineLoginLimiter, (request) => `${clientIp(request)}:line-start`), requireDatabase, (_request, response) => {
   if (!isLineLoginConfigured()) {
     response.redirect(buildClientRedirect({ line_error: "line_config_missing" }));
     return;
@@ -497,6 +633,7 @@ app.get("/api/auth/line/session", (request, response) => {
   }
 
   lineLoginResults.delete(resultCode);
+  if (result.data.token) setAuthCookie(response, result.data.token);
   response.status(result.data.statusCode || 200).json(result.data);
 });
 
@@ -508,9 +645,7 @@ app.get("/api/auth/line/status", requireDatabase, async (request, response, next
   }
 
   try {
-    const header = request.headers.authorization || "";
-    const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
-    const currentUser = verifyJwt(token, jwtSecret);
+    const currentUser = verifyJwt(getAuthToken(request), jwtSecret);
     const currentSessionId =
       currentUser?.role === "user" && currentUser.provider === "line" && currentUser.lineUserId === lineUserId
         ? currentUser.sessionId || ""
@@ -532,6 +667,7 @@ app.get("/api/auth/line/status", requireDatabase, async (request, response, next
       enforceSingleSession: true,
       currentSessionId,
     });
+    if (authResult.token) setAuthCookie(response, authResult.token);
     response.status(authResult.statusCode || 200).json(authResult);
   } catch (error) {
     next(error);

@@ -10,7 +10,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "start": "node server/index.js",
-    "test": "node tests/admin-utils.test.mjs && node tests/video-domain.test.mjs && node tests/auth-domain.test.mjs && node tests/user-session-domain.test.mjs && node tests/membership-domain.test.mjs && node tests/schema.test.mjs && node tests/realtime.test.mjs"
+    "test": "node tests/admin-utils.test.mjs && node tests/video-domain.test.mjs && node tests/auth-domain.test.mjs && node tests/security-domain.test.mjs && node tests/server-security.test.mjs && node tests/user-session-domain.test.mjs && node tests/membership-domain.test.mjs && node tests/schema.test.mjs && node tests/realtime.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.2",

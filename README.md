@@ -57,6 +57,8 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5432/course_video_dashboard
 DATABASE_SSL=false
 PORT=4174
 JWT_SECRET=change-this-to-a-long-random-secret
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=
 CLIENT_URL=http://127.0.0.1:5173
 LINE_CHANNEL_ID=
 LINE_CHANNEL_SECRET=
@@ -77,14 +79,20 @@ http://127.0.0.1:5173
 
 ## Admin Login
 
-Default admin credentials are configured in `admin-utils.mjs`.
+Default local admin credentials are:
 
 ```txt
 username: admin
 password: @admin_123
 ```
 
-For production, replace this with a real user table and hashed passwords.
+For production, set `ADMIN_USERNAME` and `ADMIN_PASSWORD_HASH`. Generate a hash with:
+
+```bash
+node -e "import('./security-domain.mjs').then(({hashPassword})=>console.log(hashPassword(process.argv[1])))" "@admin_123"
+```
+
+The server will use the hash when `ADMIN_PASSWORD_HASH` is present.
 
 ## LINE Login Setup
 
@@ -137,6 +145,9 @@ npm test
 
 - Never commit `.env`.
 - Rotate any secrets that were shared in chat or exposed during setup.
+- Production admin login supports `ADMIN_PASSWORD_HASH` and does not need the plain admin password in env.
+- API responses include security headers, and auth/admin routes are rate-limited in memory.
+- Successful logins also set a `HttpOnly` SameSite auth cookie while keeping bearer tokens compatible with the current UI.
 - The phone OTP flow is currently a demo flow that returns `demoOtp` from the API.
 - YouTube embeds cannot be made fully private by hiding buttons alone. For stronger protection, use private video hosting or signed playback URLs.
 
