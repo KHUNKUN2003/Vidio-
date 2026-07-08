@@ -21,6 +21,7 @@ import {
 } from "../user-session-domain.mjs";
 import { buildDashboardStats, normalizeVideoOrderPayload, normalizeVideoPayload } from "../video-domain.mjs";
 import { ensureSchema, pool, requireDatabase } from "./db.js";
+import { createRealtimeHub } from "./realtime.js";
 
 export const app = express();
 const port = Number(process.env.PORT || 4174);
@@ -37,6 +38,7 @@ const lineCallbackUrl = process.env.LINE_CALLBACK_URL || `${clientUrl}/api/auth/
 const otpStore = new Map();
 const lineOAuthStates = new Map();
 const lineLoginResults = new Map();
+const realtimeHub = createRealtimeHub();
 
 app.use(express.json());
 
@@ -162,6 +164,10 @@ function requireAuth(role) {
 
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true, database: Boolean(pool) });
+});
+
+app.get("/api/events", requireDatabase, (request, response) => {
+  realtimeHub.connect(request, response);
 });
 
 app.use("/api/videos", requireDatabase);
@@ -386,6 +392,7 @@ app.post("/api/auth/line/request", requireDatabase, async (request, response, ne
       lineName: payload.lineName,
     });
     const authResult = await buildLineAuthResult(membershipRequest, { enforceSingleSession: true });
+    realtimeHub.broadcast("memberships");
     response.status(authResult.statusCode || 201).json(authResult);
   } catch (error) {
     next(error);
@@ -472,6 +479,7 @@ app.get("/api/auth/line/callback", requireDatabase, async (request, response, ne
       expiresAt: Date.now() + 5 * 60 * 1000,
     });
 
+    realtimeHub.broadcast("memberships");
     response.redirect(buildClientRedirect({ line_result: resultCode }));
   } catch (error) {
     next(error);
@@ -574,8 +582,10 @@ app.patch("/api/memberships/:id/status", requireAuth("admin"), async (request, r
         "DELETE FROM user_sessions WHERE identity_type = 'line' AND identity_value = $1",
         [result.rows[0].line_user_id],
       );
+      realtimeHub.broadcast("sessions");
     }
 
+    realtimeHub.broadcast("memberships");
     response.json(result.rows[0]);
   } catch (error) {
     next(error);
@@ -596,6 +606,8 @@ app.delete("/api/memberships/:id", requireAuth("admin"), async (request, respons
       "DELETE FROM user_sessions WHERE identity_type = 'line' AND identity_value = $1",
       [result.rows[0].line_user_id],
     );
+    realtimeHub.broadcast("memberships");
+    realtimeHub.broadcast("sessions");
     response.status(204).send();
   } catch (error) {
     next(error);
@@ -630,6 +642,7 @@ app.post("/api/playlists", requireAuth("admin"), async (request, response, next)
     await replacePlaylistVideos(client, playlistResult.rows[0].id, payload.videoIds);
     await client.query("COMMIT");
 
+    realtimeHub.broadcast("playlists");
     response.status(201).json(await fetchPlaylists());
   } catch (error) {
     await client.query("ROLLBACK");
@@ -668,6 +681,7 @@ app.put("/api/playlists/:id", requireAuth("admin"), async (request, response, ne
     await replacePlaylistVideos(client, request.params.id, payload.videoIds);
     await client.query("COMMIT");
 
+    realtimeHub.broadcast("playlists");
     response.json(await fetchPlaylists());
   } catch (error) {
     await client.query("ROLLBACK");
@@ -684,6 +698,7 @@ app.delete("/api/playlists/:id", requireAuth("admin"), async (request, response,
       response.status(404).json({ error: "Playlist not found" });
       return;
     }
+    realtimeHub.broadcast("playlists");
     response.status(204).send();
   } catch (error) {
     next(error);
@@ -727,6 +742,8 @@ app.post("/api/videos", requireAuth("admin"), async (request, response, next) =>
        RETURNING id, title, youtube_url, youtube_video_id, description, is_active, sort_order, created_at, updated_at`,
       [payload.title, payload.url, payload.videoId, payload.description, payload.isActive, sortOrderResult.rows[0].next_sort_order],
     );
+    realtimeHub.broadcast("videos");
+    realtimeHub.broadcast("playlists");
     response.status(201).json(result.rows[0]);
   } catch (error) {
     if (error.code === "23505") {
@@ -766,6 +783,8 @@ app.patch("/api/videos/order", requireAuth("admin"), async (request, response, n
        FROM videos
        ORDER BY sort_order ASC, created_at DESC, id DESC`,
     );
+    realtimeHub.broadcast("videos");
+    realtimeHub.broadcast("playlists");
     response.json(result.rows);
   } catch (error) {
     await client.query("ROLLBACK");
@@ -800,6 +819,8 @@ app.put("/api/videos/:id", requireAuth("admin"), async (request, response, next)
       response.status(404).json({ error: "Video not found" });
       return;
     }
+    realtimeHub.broadcast("videos");
+    realtimeHub.broadcast("playlists");
     response.json(result.rows[0]);
   } catch (error) {
     if (error.code === "23505") {
@@ -817,6 +838,8 @@ app.delete("/api/videos/:id", requireAuth("admin"), async (request, response, ne
       response.status(404).json({ error: "Video not found" });
       return;
     }
+    realtimeHub.broadcast("videos");
+    realtimeHub.broadcast("playlists");
     response.status(204).send();
   } catch (error) {
     next(error);

@@ -22,6 +22,7 @@ function App() {
   const [, setApiError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [authNotice, setAuthNotice] = useState(null);
+  const [realtimeEvent, setRealtimeEvent] = useState(null);
 
   const selectedVideo = useMemo(
     () => videos.find((video) => video.youtube_video_id === selectedVideoId),
@@ -93,9 +94,33 @@ function App() {
     if (!session) return undefined;
 
     refreshData();
-    const intervalId = window.setInterval(() => refreshData({ silent: true }), 5000);
+    const intervalId = window.setInterval(() => refreshData({ silent: true }), 30000);
     return () => window.clearInterval(intervalId);
   }, [session, selectedVideoId]);
+
+  useEffect(() => {
+    if (!session || typeof EventSource === "undefined") return undefined;
+
+    const events = new EventSource("/api/events");
+    events.onmessage = (event) => {
+      try {
+        const realtimeData = JSON.parse(event.data);
+        setRealtimeEvent({ id: Date.now(), type: realtimeData.type });
+      } catch {
+        // Ignore malformed realtime messages and keep the polling fallback alive.
+      }
+    };
+
+    return () => events.close();
+  }, [session]);
+
+  useEffect(() => {
+    if (!realtimeEvent) return;
+
+    if (["videos", "playlists"].includes(realtimeEvent.type)) {
+      refreshData({ silent: true });
+    }
+  }, [realtimeEvent]);
 
   useEffect(() => {
     if (session?.role !== "user" || !session.token) return undefined;
@@ -168,6 +193,31 @@ function App() {
     };
   }, [session]);
 
+  useEffect(() => {
+    if (!realtimeEvent || !["memberships", "sessions"].includes(realtimeEvent.type)) return;
+    if (session?.provider !== "line" || !session.lineUserId) return;
+
+    const params = new URLSearchParams({ lineUserId: session.lineUserId });
+    fetch(`/api/auth/line/status?${params.toString()}`, {
+      headers: authHeaders(session.token),
+    })
+      .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data.canWatch) return;
+
+        setAuthNotice({
+          title: "สิทธิ์ถูกเปลี่ยนแล้ว",
+          message: "บัญชี LINE นี้ถูกปฏิเสธหรือไม่มีสิทธิ์ใช้งานแล้ว กรุณาติดต่อ admin",
+          type: "error",
+        });
+        setRoleTab("user");
+        saveSession(null);
+      })
+      .catch(() => {
+        // Keep the current session if the realtime follow-up check hits a transient network issue.
+      });
+  }, [realtimeEvent, session]);
+
   if (!session) {
     return (
       <AuthScreen
@@ -205,6 +255,7 @@ function App() {
           onSelect={setSelectedVideoId}
           onVideosReordered={setVideos}
           onPlaylistsUpdated={setPlaylists}
+          realtimeEvent={realtimeEvent}
         />
       )}
 
@@ -519,7 +570,7 @@ function AuthScreen({ notice, roleTab, onRoleChange, onLogin }) {
   );
 }
 
-function AdminDashboard({ stats, videos, playlists, isLoading, token, onRefresh, onSelect, onVideosReordered, onPlaylistsUpdated }) {
+function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEvent, onRefresh, onSelect, onVideosReordered, onPlaylistsUpdated }) {
   const emptyForm = { title: "", url: "", description: "", isActive: true };
   const emptyPlaylistForm = { title: "", description: "", videoIds: [] };
   const [activePanel, setActivePanel] = useState("videos");
@@ -573,9 +624,15 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, onRefresh,
     if (!token) return undefined;
 
     refreshMembershipRequests();
-    const intervalId = window.setInterval(() => refreshMembershipRequests(true), 3000);
+    const intervalId = window.setInterval(() => refreshMembershipRequests(true), 30000);
     return () => window.clearInterval(intervalId);
   }, [token]);
+
+  useEffect(() => {
+    if (realtimeEvent?.type === "memberships") {
+      refreshMembershipRequests(true);
+    }
+  }, [realtimeEvent]);
 
   async function updateMembershipStatus(request, status) {
     const response = await fetch(`/api/memberships/${request.id}/status`, {
