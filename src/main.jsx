@@ -958,7 +958,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
                   </button>
                   <div>
                     <strong>{video.title}</strong>
-                    <span>{video.youtube_video_id} / {video.is_active ? "active" : "inactive"}</span>
+                    <span>{video.is_active ? "active" : "inactive"}</span>
                   </div>
                   <div className="row-actions">
                     <button type="button" onClick={() => onSelect(video.youtube_video_id)}>ดู</button>
