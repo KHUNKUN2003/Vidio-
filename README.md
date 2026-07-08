@@ -22,6 +22,20 @@ Vidio+ is a private YouTube video viewer built with React, Vite, Express, and Po
 - JWT-style HMAC tokens
 - LINE Login OAuth
 
+## Deployments
+
+Primary production runs on Railway because realtime Server-Sent Events need a long-running server:
+
+```txt
+https://vidio-plus-production.up.railway.app
+```
+
+The old Vercel URL redirects to Railway:
+
+```txt
+https://vidio-plus.vercel.app
+```
+
 ## Getting Started
 
 Install dependencies:
@@ -78,6 +92,12 @@ Create a LINE Login channel in LINE Developers Console, then add this callback U
 
 ```txt
 http://127.0.0.1:4174/api/auth/line/callback
+```
+
+For production, use the Railway callback URL:
+
+```txt
+https://vidio-plus-production.up.railway.app/api/auth/line/callback
 ```
 
 Use the LINE Login channel values in `.env`:

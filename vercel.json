@@ -1,19 +1,11 @@
 {
-  "functions": {
-    "api/[...path].js": {
-      "includeFiles": "server/schema.sql"
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",
+      "status": 308,
       "headers": {
-        "Permissions-Policy": "clipboard-read=(), clipboard-write=()"
-      },
-      "continue": true
-    },
-    { "src": "/api/(.*)", "dest": "/api/[...path].js" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+        "Location": "https://vidio-plus-production.up.railway.app/$1"
+      }
+    }
   ]
 }
