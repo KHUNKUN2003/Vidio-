@@ -897,7 +897,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
             <div className="switch-row">
               <button
                 aria-checked={form.isActive}
-                aria-label="เปิดให้ user เห็น"
+                aria-label={form.isActive ? "สาธารณะ" : "ไม่สาธารณะ"}
                 className={form.isActive ? "toggle-switch is-on" : "toggle-switch"}
                 disabled={isBusy}
                 onClick={() => setForm({ ...form, isActive: !form.isActive })}
@@ -906,7 +906,7 @@ function AdminDashboard({ stats, videos, playlists, isLoading, token, realtimeEv
               >
                 <span />
               </button>
-              <span>เปิดให้ user เห็น</span>
+              <span>{form.isActive ? "สาธารณะ" : "ไม่สาธารณะ"}</span>
             </div>
             <div className="button-row">
               <button className="primary-button" disabled={isBusy} type="submit">{editingId ? "อัปเดต" : "เพิ่ม"}</button>
@@ -1030,6 +1030,7 @@ function PlaylistPanel({ form, editingId, isBusy, playlists, videos, onCancel, o
                 onChange={() => onToggleVideo(video.id)}
                 type="checkbox"
               />
+              <span className="playlist-checkmark" aria-hidden="true" />
               <span>
                 <strong>{video.title}</strong>
                 <small>{video.youtube_video_id}</small>
